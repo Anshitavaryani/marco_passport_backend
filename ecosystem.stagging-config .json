@@ -1,0 +1,21 @@
+{
+  "apps": [
+    {
+      "name": "priority-maintenance-back-end-staging",
+      "script": "index.js",
+      "instances": 1,
+      "exec_mode": "fork",
+      "autorestart": true,
+      "watch": false,
+      "time": true,
+      "max_memory_restart": "500M",
+      "merge_logs": true,
+      "kill_timeout": 12000,
+      "listen_timeout": 8000,
+      "wait_ready": true,
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "apps": [
+    {
+      "name": "priority-maintenance-back-end",
+      "script": "index.js",
+      "instances": "max",
+      "exec_mode": "cluster",
+      "autorestart": true,
+      "watch": false,
+      "time": true,
+      "max_memory_restart": "500M",
+      "merge_logs": true,
+      "kill_timeout": 12000,
+      "listen_timeout": 8000,
+      "wait_ready": true,
+      "min_uptime": "10s",
+      "max_restarts": 10,
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  ]
+}
