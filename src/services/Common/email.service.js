@@ -6,11 +6,10 @@ const logger = require("../../config/logger");
 // meaning these template files' raw source was directly fetchable by
 // anyone at e.g. GET /Email_Template/sendForgotPasswordOTPtemplate.js.
 // Relocated to live next to the service that actually uses them.
-const {
-  forgotPasswordSendOTPFormat,
-  emailVerificationFormat,
-} = require("./emailTemplates");
+
 const ApiError = require("../../utils/ApiError");
+const forgotPasswordSendOTPFormat = require("../../../public/Email_Template/sendForgotPasswordOTPtemplate");
+const emailVerificationFormat = require("../../../public/Email_Template/sendEmailVerificationFormat");
 
 const transport = nodemailer.createTransport(config.email.smtp);
 

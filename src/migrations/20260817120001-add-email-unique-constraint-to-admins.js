@@ -2,17 +2,23 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    // Same technique as the users migration, but scoped globally rather
-    // than per-role — Admin.isEmailTaken(email) (admin.model.js) checks
-    // email uniqueness across the whole admin hierarchy, not per role,
-    // unlike User's per-role scoping. This matches that existing
-    // application-level assumption at the DB level.
+    // Same technique and same revised approach as the users migration
+    // (see its comments for the full MySQL rebuild/FK explanation) —
+    // scoped globally rather than per-role, matching
+    // Admin.isEmailTaken(email)'s existing application-level assumption
+    // that admin email uniqueness applies across the whole admin
+    // hierarchy, not per role.
+    await queryInterface.addColumn('admins', 'email_active_key', {
+      type: Sequelize.STRING(100),
+      allowNull: true,
+    });
+
     await queryInterface.sequelize.query(`
-      ALTER TABLE admins
-      ADD COLUMN email_active_key VARCHAR(100)
-        GENERATED ALWAYS AS (
-          CASE WHEN deleted_at IS NULL THEN email ELSE NULL END
-        ) STORED;
+      UPDATE admins
+      SET email_active_key = CASE
+        WHEN deleted_at IS NULL THEN email
+        ELSE NULL
+      END;
     `);
 
     await queryInterface.addIndex('admins', {
@@ -24,8 +30,6 @@ module.exports = {
 
   async down(queryInterface, Sequelize) {
     await queryInterface.removeIndex('admins', 'admins_email_active_unique');
-    await queryInterface.sequelize.query(`
-      ALTER TABLE admins DROP COLUMN email_active_key;
-    `);
+    await queryInterface.removeColumn('admins', 'email_active_key');
   },
 };

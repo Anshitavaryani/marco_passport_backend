@@ -1,4 +1,5 @@
-const config = require("../../../config/config");
+const config = require("../../src/config/config");
+
 
 const emailVerificationFormat = (otp) => {
   return `<!DOCTYPE html>

@@ -44,6 +44,7 @@ function checkFileType(file, cb) {
     "jpg",
     "png",
     "gif",
+    "webp",
     "mp4",
     "mov",
     "pdf",
@@ -74,7 +75,7 @@ function checkFileType(file, cb) {
   // 2.x's error handling expects a real Error.
   cb(
     new Error(
-      "Only images (.jpeg, .jpg, .png, .gif), videos (.mp4, .mov), audio (.mp3), and documents (.pdf, .doc, .docx) are allowed."
+      "Only images (.jpeg, .jpg, .png, .gif, .webp), videos (.mp4, .mov), audio (.mp3), and documents (.pdf, .doc, .docx) are allowed."
     )
   );
 }
@@ -85,6 +86,7 @@ function getFileExtension(file) {
     "image/jpg": "jpg",
     "image/png": "png",
     "image/gif": "gif",
+    "image/webp": "webp",
     "video/mp4": "mp4",
     "video/mov": "mov",
     "application/pdf": "pdf",

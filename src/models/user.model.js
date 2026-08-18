@@ -171,4 +171,10 @@ User.beforeDestroy(async (user) => {
   user.is_active = false;
 });
 
+User.beforeSave(async (user) => {
+  user.email_role_active_key = user.deleted_at
+    ? null
+    : `${user.email}:${user.role_id}`;
+});
+
 module.exports = User;

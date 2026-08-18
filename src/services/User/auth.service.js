@@ -1,5 +1,5 @@
 const httpStatus = require("http-status");
-const bcrypt = require("bcryptjs");
+const bcrypt = require("bcrypt");
 const { toZonedTime, format: formatTz } = require("date-fns-tz");
 
 const {
@@ -20,10 +20,11 @@ const {
 const { generateAuthTokens } = require("../Common/token.service");
 const { otpTypes } = require("../../config/types");
 const generateOTP = require("../../utils/generateOTP");
+const generateRandomString = require("../../utils/randomStringGenrate");
 // Was require('../../utils/randomStringGenrate') — that file was
 // renamed (typo fix) several turns back; this was the one remaining
 // import still pointing at the old misspelled path.
-const generateRandomString = require("../../utils/randomStringGenerate");
+
 
 // Maps each multer upload field (see multer.js) to the file_type value
 // stored on the UserAttachment record.

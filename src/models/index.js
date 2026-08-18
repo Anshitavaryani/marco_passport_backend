@@ -19,6 +19,8 @@ const Faq = require("./faq.model");
 const OTP = require("./otp.model");
 
 const Payment = require("./payment.model");
+const BlogCategory = require("./blogCategory.model");
+const Blog = require("./blog.model");
 
 module.exports = {
   Country,
@@ -42,6 +44,9 @@ module.exports = {
   OTP,
 
   Payment,
+
+  BlogCategory,
+  Blog
 };
 
 function initTableRelation() {
@@ -100,6 +105,15 @@ function initTableRelation() {
   // are required unless something needs to eager-load via `include:` —
   // add them (with appropriate aliases) once a real consumer needs one,
   // rather than guessing alias names speculatively here.
+
+  BlogCategory.hasMany(Blog, {
+    foreignKey: "category_id",
+    as: "category_blogs",
+  });
+  Blog.belongsTo(BlogCategory, {
+    foreignKey: "category_id",
+    as: "blog_category",
+  });
 }
 
 initTableRelation();

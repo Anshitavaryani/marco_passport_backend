@@ -141,4 +141,8 @@ Admin.beforeDestroy(async (admin) => {
   admin.is_active = false;
 });
 
+Admin.beforeSave(async (admin) => {
+  admin.email_active_key = admin.deleted_at ? null : admin.email;
+});
+
 module.exports = Admin;

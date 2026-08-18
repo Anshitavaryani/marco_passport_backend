@@ -1,4 +1,4 @@
-const config = require("../../../config/config");
+const config = require("../../src/config/config");
 
 // Rewritten to match the same bulletproof table-based layout used in
 // sendEmailVerificationFormat.js. The previous version used CSS flexbox
