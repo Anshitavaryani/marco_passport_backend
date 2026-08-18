@@ -44,7 +44,7 @@ module.exports = {
   Payment,
 };
 
-async function initTableRelation() {
+function initTableRelation() {
   Country.hasMany(State, { foreignKey: "country_id", as: "all_state" });
   State.belongsTo(Country, { foreignKey: "country_id", as: "country" });
 
@@ -81,9 +81,25 @@ async function initTableRelation() {
   User.hasMany(UserToken, { foreignKey: "user_id", as: "user_tokens" });
   UserToken.belongsTo(User, { foreignKey: "user_id", as: "token_user" });
 
-  Role.hasMany(Admin, { foreignKey: "role_id", as: "role_users" });
-  Admin.belongsTo(Role, { foreignKey: "role_id", as: "user_role" });
+  // FIXED: this used to be a second Role<->Admin pair (identical
+  // foreignKey, identical two models, just different aliases —
+  // 'role_users'/'user_role' — duplicating the Role<->Admin
+  // association declared above for no reason). Those alias names read
+  // like they were written for User, not Admin, and User.role_id had
+  // no association defined anywhere despite the FK existing at the DB
+  // level (see user.model.js). This was almost certainly a copy-paste
+  // slip where Admin should have been User. Fixed to actually create
+  // the missing User<->Role association, reusing the aliases that were
+  // clearly intended for it.
+  Role.hasMany(User, { foreignKey: "role_id", as: "role_users" });
+  User.belongsTo(Role, { foreignKey: "role_id", as: "user_role" });
+
+  // Not yet wired up as Sequelize associations, though the FK columns
+  // exist at the DB level: OTP<->User, OTP<->Role, UserAttachment<->Role,
+  // userLoginTiming<->Role/Token/Timezone, Payment<->User. None of these
+  // are required unless something needs to eager-load via `include:` —
+  // add them (with appropriate aliases) once a real consumer needs one,
+  // rather than guessing alias names speculatively here.
 }
 
-/* Only Uncomment when data migration will complete */
 initTableRelation();

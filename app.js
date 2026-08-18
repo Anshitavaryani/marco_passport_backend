@@ -96,7 +96,7 @@ app.use(cors(corsConfigs));
 // still waiting on confirmed content for routes/v1/User/index.js and
 // routes/v1/index.js to verify this exactly.
 if (config.env === "production") {
-  app.use("/api/v1/auth", authLimiter);
+  app.use("/api/v1/user/auth", authLimiter);
   app.use("/api/v1/admin/auth", authLimiter);
 }
 

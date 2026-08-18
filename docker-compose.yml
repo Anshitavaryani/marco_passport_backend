@@ -1,0 +1,68 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ${CENTRAL_MYSQL_DB:-app_db}
+      MYSQL_USER: ${CENTRAL_MYSQL_USER:-app_user}
+      MYSQL_PASSWORD: ${CENTRAL_MYSQL_PASSWORD:-app_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: root
+    ports:
+      - "8080:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------
+  # Optional: run the app itself in Docker too. Most people developing
+  # day-to-day on macOS will get better performance and simpler debugging
+  # running `npm run dev` directly on the host (against the mysql service
+  # above via localhost:3306) instead of bind-mounting into a container.
+  # Uncomment if you want the app containerized in dev too.
+  # ---------------------------------------------------------------------
+  # app:
+  #   build:
+  #     context: .
+  #     target: development
+  #   env_file: .env
+  #   environment:
+  #     # Inside Docker's network the DB is reachable by service name, not
+  #     # localhost — this overrides CENTRAL_MYSQL_HOST from .env when the
+  #     # app itself also runs inside compose.
+  #     CENTRAL_MYSQL_HOST: mysql
+  #   ports:
+  #     - "5000:5000"
+  #   volumes:
+  #     - .:/usr/src/app
+  #     - /usr/src/app/node_modules
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+
+volumes:
+  mysql_data:
+
+# No top-level `name:` and no per-service `container_name:` on purpose —
+# Compose derives the project/container names from the folder this file
+# lives in. Rename the project folder later and the container names
+# follow automatically, instead of a stale product name being baked in
+# here. If you want fixed names regardless of folder, add:
+#   name: your-project-name
+# at the top of this file once the project has settled on one.
