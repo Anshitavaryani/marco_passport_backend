@@ -1,36 +1,39 @@
-const httpStatus = require('http-status');
-const catchAsync = require('../../utils/catchAsync');
-const ApiError = require('../../utils/ApiError');
-const { faqService } = require('../../services/Common');
-const responseWrapper = require('../../config/responseWrapper');
+const httpStatus = require("http-status");
+const catchAsync = require("../../utils/catchAsync");
+const { faqService } = require("../../services");
+const responseWrapper = require("../../config/responseWrapper");
 
 const createFaq = catchAsync(async (req, res) => {
-
-    const faq = await faqService.createFaq(req.body);
-    return responseWrapper(res, '', 'New FAQ Created Successfully.', httpStatus.CREATED);
+  const faq = await faqService.createFaq(req.body);
+  // Was responseWrapper(res, '', ...) — discarding the newly-created
+  // FAQ record (including its id) even though the service already
+  // returns it.
+  return responseWrapper(
+    res,
+    faq,
+    "New FAQ Created Successfully.",
+    httpStatus.CREATED
+  );
 });
 
 const getAllFaq = catchAsync(async (req, res) => {
-
-    const faqs = await faqService.getAllFaq();
-    return responseWrapper(res, faqs, '', httpStatus.OK);
+  const faqs = await faqService.getAllFaq();
+  return responseWrapper(res, faqs, "", httpStatus.OK);
 });
 
 const updateFaq = catchAsync(async (req, res) => {
-
-    const faq = await faqService.updateFaq(req.body, req.params.id);
-    return responseWrapper(res, faq, 'Updated Successfully', httpStatus.OK);
+  const faq = await faqService.updateFaq(req.body, req.params.id);
+  return responseWrapper(res, faq, "Updated Successfully", httpStatus.OK);
 });
 
 const deleteFaq = catchAsync(async (req, res) => {
-
-    await faqService.deleteFaq(req.params.id);
-    return responseWrapper(res, '', 'Deleted Successfully', httpStatus.OK);
+  await faqService.deleteFaq(req.params.id);
+  return responseWrapper(res, "", "Deleted Successfully", httpStatus.OK);
 });
 
 module.exports = {
-    createFaq,
-    getAllFaq,
-    updateFaq,
-    deleteFaq
+  createFaq,
+  getAllFaq,
+  updateFaq,
+  deleteFaq,
 };

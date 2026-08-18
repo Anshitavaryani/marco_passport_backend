@@ -17,7 +17,7 @@ const createContactUs = async (reqBody) => {
       "Failed to create new ContactUs"
     );
   }
-  return !!contactUsDoc;
+  return contactUsDoc;
 };
 
 const updateContactUs = async (reqBody, id) => {

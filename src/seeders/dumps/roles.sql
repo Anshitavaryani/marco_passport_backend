@@ -1,6 +1,4 @@
-
-
-INSERT INTO `roles` (`id`, `name`, `abbreviation`, `is_active`, `created_at`, `updated_at`, `deleted_at`) VALUES
+INSERT IGNORE INTO `roles` (`id`, `name`, `abbreviation`, `is_active`, `created_at`, `updated_at`, `deleted_at`) VALUES
 (1, 'Super Admin', 'SUP_ADM', 1, '2023-05-30 19:24:35', '2023-09-18 16:19:06', NULL),
 (2, 'Admin', 'ADM', 1, '2023-05-30 19:24:41', '2023-05-30 19:24:41', NULL),
 (3, 'Sub_Admin', 'SUB_ADM', 1, '2023-05-30 19:25:04', '2023-05-30 19:25:04', NULL),

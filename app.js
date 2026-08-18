@@ -42,7 +42,23 @@ app.use(
 );
 
 // parse json request body
-app.use(express.json());
+// Stripe webhook signature verification (see payment.controller.js's
+// handleChargeAndIntentWebhook) requires the raw, unparsed request body
+// bytes — the signature is computed over the exact raw payload, and
+// verifying against an already-JSON-parsed-then-restringified object
+// will never match. Capturing the raw buffer here via `verify` means
+// every route still gets a normally-parsed req.body, while the webhook
+// route can use req.rawBody specifically for signature verification —
+// this avoids needing to carve a path-specific exclusion out of this
+// global middleware (which is order-sensitive and easy to get subtly
+// wrong once other middleware also touches the body).
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 
 // parse urlencoded request body
 app.use(express.urlencoded({ extended: true }));
@@ -69,8 +85,19 @@ app.use(express.static(PUBLIC_DIR));
 app.use(cors(corsConfigs));
 
 // limit repeated failed requests to auth endpoints
+// Was scoped to '/v1/auth' — but every route in this app mounts under
+// '/api/v1/...' (see app.use('/api/v1', routes) below), not '/v1/...'.
+// That prefix never matched a single real request, meaning this rate
+// limiter has provided zero brute-force protection this entire time,
+// in production or otherwise. Covering both real auth entry points
+// (user auth and admin auth) explicitly.
+// NOTE: '/api/v1/auth' is my best guess at the user-auth mount path,
+// based on the admin route using '/admin/auth' as a parallel structure —
+// still waiting on confirmed content for routes/v1/User/index.js and
+// routes/v1/index.js to verify this exactly.
 if (config.env === "production") {
-  app.use("/v1/auth", authLimiter);
+  app.use("/api/v1/auth", authLimiter);
+  app.use("/api/v1/admin/auth", authLimiter);
 }
 
 app.get("/api/healthcheck", function (req, res) {
