@@ -54,9 +54,10 @@ function checkFileType(file, cb) {
   ];
 
   const fileExtension = path.extname(file.originalname).toLowerCase();
-  const isValidExtension = allowedFiletypes.includes(
-    fileExtension.substring(1)
-  );
+
+  const extension = fileExtension.substring(1);
+
+  const isValidExtension = allowedFiletypes.includes(extension);
 
   const isValidMimeType =
     file.mimetype.startsWith("image/") ||
@@ -65,18 +66,33 @@ function checkFileType(file, cb) {
     file.mimetype.startsWith("audio/") ||
     file.mimetype === "application/msword" ||
     file.mimetype ===
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    // Some clients (Postman, certain OS file pickers, some browsers on
+    // unusual file paths) send this generic fallback mimetype instead
+    // of a real one — e.g. a plain .jpg upload arriving as
+    // application/octet-stream. Since the extension is already
+    // validated against the allow-list above, trusting it here too
+    // rather than hard-rejecting is reasonable — this mimetype check
+    // was already documented as spoofable/best-effort, not a real
+    // security boundary (see the NOTE below on content sniffing).
+    file.mimetype === "application/octet-stream";
+
+  console.log("UPLOAD DEBUG:", {
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    extension,
+    isValidExtension,
+    isValidMimeType,
+  });
 
   if (isValidExtension && isValidMimeType) {
     return cb(null, true);
   }
-  // multer 2.x requires an Error object here, not a string — the
-  // previous code passed a plain string, which multer 1.x tolerated but
-  // 2.x's error handling expects a real Error.
+
   cb(
     new Error(
-      "Only images (.jpeg, .jpg, .png, .gif, .webp), videos (.mp4, .mov), audio (.mp3), and documents (.pdf, .doc, .docx) are allowed."
-    )
+      "Only images (.jpeg, .jpg, .png, .gif, .webp), videos (.mp4, .mov), audio (.mp3), and documents (.pdf, .doc, .docx) are allowed.",
+    ),
   );
 }
 
@@ -95,7 +111,16 @@ function getFileExtension(file) {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
       "docx",
   };
-  return mimeToExtMap[file.mimetype] || "txt";
+  // Falls back to the ORIGINAL file's extension (already validated
+  // against the allow-list in checkFileType) when the mimetype isn't a
+  // recognized key — covers the application/octet-stream case above,
+  // where the mimetype alone can't tell us the real file type but the
+  // extension already did.
+  const originalExt = path
+    .extname(file.originalname)
+    .toLowerCase()
+    .substring(1);
+  return mimeToExtMap[file.mimetype] || originalExt || "txt";
 }
 
 // NOTE: mimetype/extension checks trust client-supplied values, which are

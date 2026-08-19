@@ -1,5 +1,5 @@
 const userAuthRoute = require('./auth.route');
-const userOpRoute = require('./user.route');
+const userRoute = require('./user.route');
 
 const customerRoutes = [
     {
@@ -8,7 +8,7 @@ const customerRoutes = [
     },
     {
         path: '/user/',
-        route: userOpRoute,
+        route: userRoute,
     }
 ];
 

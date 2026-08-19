@@ -10,26 +10,17 @@ const config = require("../config/config");
 const responseWrapper = require("../config/responseWrapper");
 const { validateResetPassordBody } = require("./common.middleware");
 
-// Roles allowed to self-register through this public endpoint.
-// Previously role_id was accepted from the request header with no
-// restriction at all — a request could set role_id to any of config's
-// admin-hierarchy role IDs (SUP_ADM_ROLE_ID, ADM_ROLE_ID, etc.) and get a
-// User record created carrying that role_id, which is a straightforward
-// privilege-escalation path anywhere downstream trusts the persisted
-// role_id. Only USR is included here — still need confirmation on
-// whether SP (Service Provider?) should also be self-registerable; add
-// it to this list once that's confirmed.
 const SELF_REGISTERABLE_ROLE_IDS = [config.USR_ROLE_ID].filter(Boolean);
 
 const validateRegisterUserBody = catchAsync(async (req, res, next) => {
-  const { name, email, mobile, password, confirm_password } = req.body;
+  const { name, email, password, confirm_password } = req.body || {};
   const { role_id } = req.headers;
 
-  if (!name || !email || !mobile || !password || !confirm_password) {
+  if (!name || !email || !password || !confirm_password) {
     return responseWrapper(
       res,
       "",
-      "Please Enter Required Fields : [ name || email || mobile || password || confirm_password ]",
+      "Please Enter Required Fields : [ name || email || password || confirm_password ]",
       httpStatus.BAD_REQUEST
     );
   }
@@ -83,7 +74,7 @@ const validateRegisterUserBody = catchAsync(async (req, res, next) => {
 });
 
 const validateSignInReqBody = catchAsync(async (req, res, next) => {
-  const { email, password } = req.body;
+  const { email, password } = req.body || {};
 
   if (!email || !password) {
     return responseWrapper(
@@ -93,6 +84,8 @@ const validateSignInReqBody = catchAsync(async (req, res, next) => {
       httpStatus.BAD_REQUEST
     );
   }
+
+  if (!req.body) req.body = {};
   req.body.ip_address = req.ip;
 
   next();
@@ -113,10 +106,6 @@ const verifyAuthJWTToken = catchAsync(async (req, res, next) => {
   try {
     payload = jwt.verify(token, config.jwt.secret);
   } catch (jwtError) {
-    // Previously any jwt.verify failure (including a plain expired
-    // token — a completely normal, expected occurrence) bubbled up
-    // through a generic catch that defaulted to a 500. An expired or
-    // malformed token is a client-facing 401, not a server error.
     const message =
       jwtError.name === "TokenExpiredError"
         ? "Token has expired. Please log in again."
@@ -124,11 +113,6 @@ const verifyAuthJWTToken = catchAsync(async (req, res, next) => {
     return responseWrapper(res, "", message, httpStatus.UNAUTHORIZED);
   }
 
-  // Was reading role_id from req.headers['role_id'] here — a mutable
-  // client header — even though a valid, already-signed token exists
-  // with its own role_id claim embedded at issuance time. Deriving it
-  // from the verified payload means this can no longer be spoofed by
-  // whatever the client happens to send in a header on this request.
   const role_id = payload.role_id;
 
   const tokenDoc = await UserToken.findOne({
@@ -165,14 +149,67 @@ const verifyAuthJWTToken = catchAsync(async (req, res, next) => {
     return responseWrapper(res, "", "User Not Found", httpStatus.NOT_FOUND);
   }
 
+  if (!req.body) {
+    req.body = {};
+  }
+
   req.body.user = user;
   req.body.tokenDoc = tokenDoc;
   req.body.ip_address = req.ip;
   next();
 });
 
+// Optional auth — for PUBLIC routes that want to personalize their
+// response for a logged-in visitor without requiring login. Unlike
+// verifyAuthJWTToken, this never blocks the request: no token, an
+// expired token, or an invalid token all just fall through with
+// req.body.user left unset, and the route behaves exactly as it would
+// for a fully anonymous visitor.
+//
+// req.body is guarded RIGHT HERE, before the no-token early return —
+// not just in the success path further down. A GET request with no
+// token never gets any body-parsing middleware to run at all, so
+// req.body is genuinely undefined at this point; downstream
+// controllers reading req.body.user?.id would crash on req.body
+// itself (not just .user) if this function returned early without
+// first making sure req.body is at least an empty object.
+const attachUserIfPresent = async (req, res, next) => {
+  if (!req.body) req.body = {};
+
+  const token = req.headers["x-access-token"];
+  if (!token) return next();
+
+  try {
+    const payload = jwt.verify(token, config.jwt.secret);
+    const role_id = payload.role_id;
+
+    const tokenDoc = await UserToken.findOne({
+      where: {
+        token: token,
+        role_id: role_id,
+        token_type: tokenTypes.ACCESS,
+        user_id: payload.sub,
+        is_active: true,
+      },
+    });
+    if (!tokenDoc) return next();
+
+    const user = await User.findOne({
+      where: { id: tokenDoc.user_id, is_active: 1, role_id: role_id },
+    });
+    if (user) {
+      req.body.user = user;
+    }
+  } catch (jwtError) {
+    // Expired/invalid token on an optional-auth route — proceed
+    // anonymously rather than rejecting the request.
+  }
+
+  next();
+};
+
 const validateForgetPassordToken = catchAsync(async (req, res, next) => {
-  const { email, password, confirm_password, token } = req.body;
+  const { email, password, confirm_password, token } = req.body || {};
   const { role_id } = req.headers;
 
   if (!email || !password || !confirm_password || !token) {
@@ -196,12 +233,6 @@ const validateForgetPassordToken = catchAsync(async (req, res, next) => {
     );
   }
 
-  // Added role_id to this filter — it was missing, so a verified OTP
-  // token issued for one role_id's account (a person can hold more
-  // than one account under the same email, scoped by role_id — see
-  // isEmailTaken(email, role_id) above) could be replayed against a
-  // *different* role_id's account for the same email, since only the
-  // account lookup above was role-scoped, not this OTP/token check.
   const otpDoc = await OTP.findOne({
     where: {
       email: email,
@@ -235,6 +266,7 @@ const setRoleIdIfNotPresent = (req, res, next) => {
 module.exports = {
   validateRegisterUserBody,
   verifyAuthJWTToken,
+  attachUserIfPresent,
   validateResetPassordBody,
   setRoleIdIfNotPresent,
   validateForgetPassordToken,

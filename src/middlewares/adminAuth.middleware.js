@@ -99,15 +99,6 @@ const validateJWTtoken = catchAsync(async (req, res, next) => {
 
   let payload;
   try {
-    // Previously: jwt.verify(token, Buffer.from(config.jwt.secret, 'hex'), { algorithm: 'HS256' })
-    // Two bugs there: (1) the secret is never hex-encoded at sign
-    // time — token.service.js signs with the plain secret string —
-    // so checking the signature against Buffer.from(secret, 'hex')
-    // checked it against entirely the wrong bytes. Every admin token
-    // verification failed. (2) `algorithm` (singular) isn't a real
-    // jwt.verify() option; it's `algorithms` (plural, array). The
-    // singular key was silently ignored, so the intended
-    // algorithm allow-list was never actually enforced.
     payload = jwt.verify(token, config.jwt.secret, { algorithms: ["HS256"] });
   } catch (jwtError) {
     const message =
@@ -117,12 +108,6 @@ const validateJWTtoken = catchAsync(async (req, res, next) => {
     return responseWrapper(res, "", message, httpStatus.UNAUTHORIZED);
   }
 
-  // Confirms the admin account still exists AND is still active — a
-  // JWT stays valid by signature alone until it expires, regardless of
-  // what happens to the account it names in the meantime (deactivated,
-  // deleted, etc). Filtering on is_active means a deactivated admin's
-  // still-valid JWT stops working immediately rather than at whatever
-  // point it happens to expire on its own.
   const admin = await Admin.findOne({
     where: { id: payload.sub, is_active: true },
   });
@@ -135,17 +120,18 @@ const validateJWTtoken = catchAsync(async (req, res, next) => {
     );
   }
 
-  // NOTE (architectural gap, not fixable in this file alone): there's
-  // no AdminToken table analogous to UserToken, so there's currently no
-  // way to revoke a specific admin session before its JWT naturally
-  // expires — a fired employee's token, or a just-changed password,
-  // both stay valid until `exp`. The old `is_backlisted` check that
-  // used to be here never actually worked (nothing ever set that field
-  // on the JWT payload), so removing it doesn't lose real
-  // functionality — it just stops pretending there was a revocation
-  // mechanism where there wasn't one. Worth a real fix (an AdminToken
-  // table mirroring UserToken) if revocation matters — happy to design
-  // that when we get to the models layer.
+  // req.body is only ever populated by a prior body-parsing middleware
+  // (express.json(), multer, etc.) that actually matched the request's
+  // Content-Type. A GET request typically sends no body at all, so
+  // nothing runs and req.body stays undefined — writing `.user` onto
+  // that threw "Cannot set properties of undefined" the moment any GET
+  // route was placed behind this middleware (e.g. GET /explore/admin).
+  // This guard makes sure there's always an object here to write onto,
+  // regardless of the request method or whether a body was sent.
+  if (!req.body) {
+    req.body = {};
+  }
+
   req.user = payload;
   req.body.user = admin;
   next();

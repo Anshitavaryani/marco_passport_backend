@@ -153,12 +153,37 @@ const findBlogById = async (id) => {
   return blogDoc ? blogDoc : [];
 };
 
-const findBlogBySlug = async (slug) => {
-  const blogDoc = await Blog.findOne({
-    where: { slug, is_active: true },
-    include: [CATEGORY_INCLUDE],
+const getBlogsByCategorySlug = async (slug) => {
+  // "all" means return all active blogs
+  if (slug === "all") {
+    return await Blog.findAll({
+      where: { is_active: true },
+      include: [CATEGORY_INCLUDE],
+      order: [["published_at", "DESC"]],
+    });
+  }
+
+  const categoryDoc = await BlogCategory.findOne({
+    where: {
+      slug,
+      is_active: true,
+    },
   });
-  return blogDoc ? blogDoc : [];
+
+  if (!categoryDoc) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Blog category not found.");
+  }
+
+  const blogDocs = await Blog.findAll({
+    where: {
+      category_id: categoryDoc.id,
+      is_active: true,
+    },
+    include: [CATEGORY_INCLUDE],
+    order: [["published_at", "DESC"]],
+  });
+
+  return blogDocs;
 };
 
 const deleteBlog = async (id) => {
@@ -174,6 +199,6 @@ module.exports = {
   updateBlog,
   getAllBlogs,
   findBlogById,
-  findBlogBySlug,
+  getBlogsByCategorySlug,
   deleteBlog,
 };

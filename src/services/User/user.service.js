@@ -49,8 +49,6 @@ const getProfile = async (body, headers) => {
     where: { id: user?.id, is_active: true, role_id: role_id },
   });
   if (!result) {
-    // Was httpStatus.BAD_REQUEST (400) — a profile genuinely not
-    // existing is a not-found condition.
     throw new ApiError(httpStatus.NOT_FOUND, "Profile not found.");
   }
   return result;
@@ -58,14 +56,6 @@ const getProfile = async (body, headers) => {
 
 const deactivateAccount = async (reqBody) => {
   const { user } = reqBody;
-  // Was: `const isDeactivated = await user.destroy(); if (!isDeactivated) throw ...`
-  // Sequelize's instance.destroy() resolves to undefined on success —
-  // it doesn't return a truthy value the way .save() does. That meant
-  // this check ALWAYS threw "Failed to deactivate your account", even
-  // when the deactivation genuinely succeeded (the DB row was correctly
-  // soft-deleted either way — only the API response was wrong,
-  // reporting failure on every successful call). destroy() rejecting
-  // on a real failure already propagates without a manual check.
   await user.destroy();
   return "";
 };
@@ -81,5 +71,4 @@ module.exports = {
   getProfile,
   deactivateAccount,
   notificationToggle,
-  notificationToogle: notificationToggle, // deprecated alias (typo) — drop once callers are confirmed switched to notificationToggle
 };

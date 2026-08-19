@@ -17,12 +17,10 @@ const getAllBlogs = catchAsync(async (req, res) => {
   return responseWrapper(res, blogs, "");
 });
 
-const findBlogBySlug = catchAsync(async (req, res) => {
-  const blogDoc = await blogService.findBlogBySlug(req.params.slug);
-  if (!blogDoc || (Array.isArray(blogDoc) && blogDoc.length === 0)) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Blog post not found.");
-  }
-  return responseWrapper(res, blogDoc, "");
+const getBlogsByCategorySlug = catchAsync(async (req, res) => {
+  const blogs = await blogService.getBlogsByCategorySlug(req.params.slug);
+
+  return responseWrapper(res, blogs, "");
 });
 
 const findBlogById = catchAsync(async (req, res) => {
@@ -70,7 +68,7 @@ const deleteBlog = catchAsync(async (req, res) => {
 
 module.exports = {
   getAllBlogs,
-  findBlogBySlug,
+  getBlogsByCategorySlug,
   findBlogById,
   createBlog,
   updateBlog,

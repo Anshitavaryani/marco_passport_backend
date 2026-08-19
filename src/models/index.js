@@ -21,6 +21,13 @@ const OTP = require("./otp.model");
 const Payment = require("./payment.model");
 const BlogCategory = require("./blogCategory.model");
 const Blog = require("./blog.model");
+const Place = require("./place.model");
+const PlaceCategory = require("./placeCategory.model");
+const PlaceCategoryMap = require("./placeCategoryMap.model");
+const Review = require("./review.model");
+
+const BusinessSubmission = require("./businessSubmission.model");
+const Passport = require("./passport.model");
 
 module.exports = {
   Country,
@@ -46,7 +53,15 @@ module.exports = {
   Payment,
 
   BlogCategory,
-  Blog
+  Blog,
+
+  Place,
+  PlaceCategory,
+  PlaceCategoryMap,
+  Review,
+
+  BusinessSubmission,
+  Passport,
 };
 
 function initTableRelation() {
@@ -114,6 +129,31 @@ function initTableRelation() {
     foreignKey: "category_id",
     as: "blog_category",
   });
+
+  Place.belongsToMany(PlaceCategory, {
+    through: PlaceCategoryMap,
+    foreignKey: "place_id",
+    otherKey: "category_id",
+    as: "categories",
+  });
+  PlaceCategory.belongsToMany(Place, {
+    through: PlaceCategoryMap,
+    foreignKey: "category_id",
+    otherKey: "place_id",
+    as: "places",
+  });
+
+  Place.hasMany(Review, { foreignKey: "place_id", as: "place_reviews" });
+  Review.belongsTo(Place, { foreignKey: "place_id", as: "review_place" });
+
+  User.hasMany(Review, { foreignKey: "user_id", as: "user_reviews" });
+  Review.belongsTo(User, { foreignKey: "user_id", as: "reviewer" });
+
+  User.hasMany(Passport, { foreignKey: "user_id", as: "user_passports" });
+  Passport.belongsTo(User, { foreignKey: "user_id", as: "passport_user" });
+
+  Place.hasMany(Passport, { foreignKey: "place_id", as: "place_passports" });
+  Passport.belongsTo(Place, { foreignKey: "place_id", as: "passport_place" });
 }
 
 initTableRelation();

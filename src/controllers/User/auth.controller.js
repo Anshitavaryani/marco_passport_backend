@@ -15,13 +15,6 @@ const sendOTP = catchAsync(async (req, res) => {
 });
 
 const verifyOTP = catchAsync(async (req, res) => {
-  // Checked this one against auth.service.js's verifyOTP: its
-  // non-token branch returns a real boolean (affectedCount > 0), so
-  // `false` here genuinely does represent an inconsistency worth
-  // surfacing (the OTP was valid, but the matching User row wasn't
-  // updated — e.g. the account was deactivated in between). Unlike
-  // adminAuth.controller.js's equivalent check, this one isn't
-  // checking the wrong thing — just had a typo in the message.
   const status = await userAuthService.verifyOTP(
     req.body.email,
     req.body.otp,
@@ -46,7 +39,6 @@ const register = catchAsync(async (req, res) => {
   const body = pick(req.body, [
     "name",
     "email",
-    "mobile",
     "password",
     "confirm_password",
   ]);
@@ -55,7 +47,7 @@ const register = catchAsync(async (req, res) => {
   return responseWrapper(
     res,
     response,
-    "User Created Successfully. Please Check Your Email to verify Your Account.",
+    "User Created Successfully.",
     httpStatus.CREATED
   );
 });

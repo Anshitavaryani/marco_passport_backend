@@ -18,16 +18,10 @@ const {
   sendEmailVerification,
 } = require("../Common/email.service");
 const { generateAuthTokens } = require("../Common/token.service");
-const { otpTypes } = require("../../config/types");
+const { otpTypes, userStatusTypes } = require("../../config/types");
 const generateOTP = require("../../utils/generateOTP");
 const generateRandomString = require("../../utils/randomStringGenrate");
-// Was require('../../utils/randomStringGenrate') — that file was
-// renamed (typo fix) several turns back; this was the one remaining
-// import still pointing at the old misspelled path.
 
-
-// Maps each multer upload field (see multer.js) to the file_type value
-// stored on the UserAttachment record.
 const UPLOAD_FIELD_TYPES = {
   images: "Image",
   gifs: "Gif",
@@ -47,6 +41,11 @@ const isValidTimezone = (tz) => {
   }
 };
 
+// sendOTP / verifyOTP are kept fully intact and exported below, even
+// though nothing currently calls them — OTP-based email verification
+// is disabled site-wide for now (frontend captcha handles bot
+// prevention at signup instead), not removed. See the commented block
+// inside register() for how to turn it back on.
 const sendOTP = async (body, headers) => {
   const { email, type } = body;
   const { role_id } = headers;
@@ -60,7 +59,6 @@ const sendOTP = async (body, headers) => {
   });
   if (existingOtp) await existingOtp.destroy({ force: true });
 
-  // Was randomize('0', 4) — see utils/generateOTP.js.
   const generatedOTP = generateOTP(4);
   const otpObj = {
     email: email,
@@ -117,12 +115,6 @@ const verifyOTP = async (email, otp, type, role_id) => {
   let isUpdate = false;
   let token = "";
   if (type !== otpTypes.FORGOT_PASSWORD) {
-    // Added role_id to this filter — it was missing, so verifying
-    // one role-scoped account's email (a person can hold more than
-    // one account under the same email, scoped by role_id — see
-    // User.isEmailTaken(email, role_id)) could mark EVERY account
-    // under that email as ACCEPTED, not just the one actually being
-    // verified.
     const [affectedCount] = await User.update(
       { status: "ACCEPTED" },
       { where: { email: email, role_id: role_id, is_active: true } }
@@ -136,14 +128,23 @@ const verifyOTP = async (email, otp, type, role_id) => {
   return token ? { token } : isUpdate;
 };
 
+// Signup collects only name/email/password/confirm_password now — no
+// mobile requirement, no OTP/email verification step. `mobile` is
+// still accepted if the caller happens to send it (kept nullable on
+// Profile), just no longer required or asked for by the frontend.
 const register = async (body, files, headers) => {
-  const { name, email, mobile, password, confirm_password } = body;
+  const { name, email, mobile, password } = body;
   const { role_id } = headers;
   const salt = bcrypt.genSaltSync(10);
   const userObj = {
     email: email,
     password: bcrypt.hashSync(password, salt),
     role_id: role_id,
+    // OTP verification is disabled (see the commented block below), so
+    // there's no separate step left to flip this from PENDING to
+    // ACCEPTED — set directly here instead. Revert to the model's
+    // default (PENDING) if OTP verification is re-enabled.
+    status: userStatusTypes.ACCEPTED,
   };
   const user = await User.create(userObj);
   if (!user) {
@@ -156,7 +157,7 @@ const register = async (body, files, headers) => {
   const profileObj = {
     email: email,
     name: name,
-    mobile: mobile,
+    mobile: mobile || null,
     user_id: user.id,
   };
   const userProfile = await Profile.create(profileObj);
@@ -166,39 +167,39 @@ const register = async (body, files, headers) => {
       "Failed to create New Record"
     );
 
-  const existingOtp = await OTP.findOne({
-    where: {
-      email: email,
-      type: otpTypes.EMAIL_VERIFICATION,
-      role_id: role_id,
-    },
-  });
-  if (existingOtp) await existingOtp.destroy({ force: true });
+  // --- OTP / email verification — disabled for now, kept for later ---
+  // This site currently uses frontend captcha instead of an OTP
+  // verification step at signup, and `status` is set to ACCEPTED
+  // directly above. To re-enable this flow: uncomment the block below,
+  // change the status above back to the model's default (PENDING), and
+  // uncomment the /otp and /verify-otp routes in auth.route.js.
+  //
+  // const existingOtp = await OTP.findOne({
+  //   where: {
+  //     email: email,
+  //     type: otpTypes.EMAIL_VERIFICATION,
+  //     role_id: role_id,
+  //   },
+  // });
+  // if (existingOtp) await existingOtp.destroy({ force: true });
+  //
+  // const generatedOTP = generateOTP(4);
+  // const otpObj = {
+  //   user_id: user.id,
+  //   email: email,
+  //   code: generatedOTP,
+  //   type: otpTypes.EMAIL_VERIFICATION,
+  //   role_id: role_id,
+  // };
+  // const otpDoc = await OTP.create(otpObj);
+  // if (!otpDoc) {
+  //   throw new ApiError(
+  //     httpStatus.INTERNAL_SERVER_ERROR,
+  //     "Failed to generate new OTP."
+  //   );
+  // }
+  // await sendEmailVerification(email, generatedOTP);
 
-  const generatedOTP = generateOTP(4);
-  const otpObj = {
-    user_id: user.id,
-    email: email,
-    code: generatedOTP,
-    type: otpTypes.EMAIL_VERIFICATION,
-    role_id: role_id,
-  };
-  const otpDoc = await OTP.create(otpObj);
-  if (!otpDoc) {
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      "Failed to generate new OTP."
-    );
-  }
-  await sendEmailVerification(email, generatedOTP);
-
-  // Was an if/else-if chain checking only files.images then
-  // files.gifs — meaning if a request uploaded BOTH images and gifs
-  // together, the gifs were silently never saved as UserAttachment
-  // records (though multer had already written them to disk,
-  // orphaned with no DB reference). videos/docs/songs — all valid
-  // multer fields per multer.js — weren't handled at all. This
-  // handles every upload field independently.
   if (files) {
     for (const [field, fileType] of Object.entries(UPLOAD_FIELD_TYPES)) {
       const uploadedFiles = files[field];
@@ -248,12 +249,6 @@ const login = async (reqBody, headers) => {
   const token = await generateAuthTokens(user);
 
   if (token) {
-    // Login-timing is analytics, not auth — a failure here (an
-    // unrecognized timezone header, a transient DB hiccup) must
-    // never block someone with valid credentials from logging in.
-    // This wasn't wrapped before, so saveLoginTiming throwing (e.g.
-    // a bad timezone causing a null-dereference inside it, fixed
-    // below too) failed the entire login.
     try {
       await saveLoginTiming(user, token, reqBody, timezone);
     } catch (error) {
@@ -327,12 +322,6 @@ const logout = async (reqBody, headers) => {
 
 const saveLoginTiming = async (user, token, reqBody, timezone) => {
   const loginTimeUTC = new Date();
-  // Was moment.tz(loginTimeUTC, timezone) — moment-timezone silently
-  // falls back/produces an invalid moment for a bad timezone string
-  // rather than throwing, which just meant bad data got stored quietly.
-  // Intl.DateTimeFormat throws a RangeError for an invalid IANA
-  // timezone, which is what's used here to validate before conversion
-  // rather than after.
   const safeTimezone = isValidTimezone(timezone) ? timezone : "UTC";
   const loginTimeLocal = formatTz(
     toZonedTime(loginTimeUTC, safeTimezone),
@@ -345,11 +334,6 @@ const saveLoginTiming = async (user, token, reqBody, timezone) => {
   const timeZoneDoc = await Timezone.findOne({
     where: { time_zone: safeTimezone, is_active: true },
   });
-  // Was: `time_zone: timeZoneDoc.id` with no null check — if the
-  // client's timezone (or the UTC fallback) isn't in the seeded
-  // Timezone table, this threw a TypeError reading .id off null,
-  // which (before the try/catch added at the login() call site above)
-  // used to fail the entire login.
   if (!timeZoneDoc) {
     logger.warn(
       `No matching Timezone row for "${safeTimezone}" — skipping login-timing record.`
@@ -373,9 +357,6 @@ const saveLoginTiming = async (user, token, reqBody, timezone) => {
 const saveLogoutTiming = async (tokenDoc, timezone) => {
   const logoutTimeUTC = new Date();
   const safeTimezone = isValidTimezone(timezone) ? timezone : "UTC";
-  // Was storing the raw moment object directly (unlike
-  // saveLoginTiming, which formatted it to a string first) —
-  // inconsistent between the two, now matching.
   const logoutTimeLocal = formatTz(
     toZonedTime(logoutTimeUTC, safeTimezone),
     "yyyy-MM-dd HH:mm:ss",
