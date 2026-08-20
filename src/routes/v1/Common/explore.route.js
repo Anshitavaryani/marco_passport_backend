@@ -4,6 +4,7 @@ const router = express.Router();
 const { placeController } = require("../../../controllers");
 const { adminAuthMiddleware, roleMiddleware, userAuthMiddleware } = require("../../../middlewares");
 const upload = require("../../../config/multer");
+const reviewRoute = require("./review.route");
 
 const requireAdmin = [
   adminAuthMiddleware.validateJWTtoken,
@@ -12,18 +13,19 @@ const requireAdmin = [
 
 // ---------------------------------------------------------------------
 // Public — business listings (the live site's /explore directory)
-// attachUserIfPresent lets these responses include is_in_passport per
-// place when the request happens to come from a logged-in user, while
-// staying fully public/anonymous-friendly otherwise.
 // ---------------------------------------------------------------------
 router.get("/", userAuthMiddleware.attachUserIfPresent, placeController.getExplore);
 router.get("/listing/:slug", userAuthMiddleware.attachUserIfPresent, placeController.findBusinessBySlug);
+// Nested — :placeId here is a listing's numeric id, not its slug.
+// mergeParams in review.route.js is what makes it visible there.
+router.use("/listing/:placeId/reviews", reviewRoute);
 
 // ---------------------------------------------------------------------
 // Public — places-to-visit (the live site's /places page)
 // ---------------------------------------------------------------------
 router.get("/places", userAuthMiddleware.attachUserIfPresent, placeController.getPlacesToVisit);
 router.get("/places/:slug", userAuthMiddleware.attachUserIfPresent, placeController.findPlaceToVisitBySlug);
+router.use("/places/:placeId/reviews", reviewRoute);
 
 // ---------------------------------------------------------------------
 // Admin — generic CRUD for both types

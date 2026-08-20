@@ -7,7 +7,7 @@ const { userAuthMiddleware } = require("../../../middlewares");
 // mergeParams so :placeId from the parent mount (e.g.
 // /explore/:placeId/reviews) is visible here.
 router.get("/", reviewController.getReviewsForPlace);
-router.post("/:id", [userAuthMiddleware.verifyAuthJWTToken], reviewController.createReview);
+router.post("/", [userAuthMiddleware.verifyAuthJWTToken], reviewController.createReview);
 router.put("/:id", [userAuthMiddleware.verifyAuthJWTToken], reviewController.updateReview);
 router.delete("/:id", [userAuthMiddleware.verifyAuthJWTToken], reviewController.deleteReview);
 
