@@ -27,9 +27,15 @@ PlaceCategory.init(
       type: DataTypes.STRING(100),
       allowNull: false,
     },
+    // No longer unique:true — same soft-delete-vs-unique-constraint fix
+    // as blog_categories/places. Real uniqueness lives on slug_active.
     slug: {
       type: DataTypes.STRING(150),
       allowNull: false,
+    },
+    slug_active: {
+      type: DataTypes.STRING(150),
+      allowNull: true,
       unique: true,
     },
     // Category card background image (see the "Explore by category"
@@ -69,12 +75,17 @@ PlaceCategory.init(
 );
 
 PlaceCategory.isSlugTaken = async function (slug) {
-  const existing = await this.findOne({ where: { slug, is_active: true } });
+  const existing = await this.findOne({ where: { slug_active: slug } });
   return !!existing;
 };
 
+PlaceCategory.beforeSave(async (category) => {
+  category.slug_active = category.is_active ? category.slug : null;
+});
+
 PlaceCategory.beforeDestroy(async (category) => {
   category.is_active = false;
+  category.slug_active = null;
 });
 
 module.exports = PlaceCategory;

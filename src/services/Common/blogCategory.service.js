@@ -9,9 +9,6 @@ const createCategory = async (reqBody) => {
     throw new ApiError(httpStatus.BAD_REQUEST, "Category name is required.");
   }
 
-  // Auto-derive slug from name unless one was explicitly provided —
-  // matches the URL-safe segment the frontend needs for category
-  // filtering (e.g. "Food & Dining" -> "food-dining").
   const slug = reqBody.slug
     ? slugify(reqBody.slug, { lower: true, strict: true })
     : slugify(reqBody.name, { lower: true, strict: true });
@@ -43,27 +40,38 @@ const updateCategory = async (reqBody, id) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Blog category not found");
   }
 
-  if (
+  const nameChanged =
     reqBody.name &&
     typeof reqBody.name !== "undefined" &&
-    reqBody.name !== ""
-  ) {
+    reqBody.name !== "" &&
+    reqBody.name !== categoryDoc.name;
+
+  if (nameChanged) {
     categoryDoc["name"] = reqBody.name;
   }
 
-  if (
-    reqBody.slug &&
-    typeof reqBody.slug !== "undefined" &&
-    reqBody.slug !== ""
-  ) {
-    const newSlug = slugify(reqBody.slug, { lower: true, strict: true });
-    if (newSlug !== categoryDoc.slug && (await BlogCategory.isSlugTaken(newSlug))) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        "A category with this slug already exists."
-      );
+  // If a slug was explicitly provided, use that (existing behavior).
+  // Otherwise, if the name just changed, auto-regenerate the slug from
+  // the new name — matches createCategory's own auto-derive behavior,
+  // so an update doesn't silently leave a stale slug that no longer
+  // matches the category's actual name.
+  const explicitSlug =
+    reqBody.slug && typeof reqBody.slug !== "undefined" && reqBody.slug !== "";
+
+  if (explicitSlug || nameChanged) {
+    const newSlug = explicitSlug
+      ? slugify(reqBody.slug, { lower: true, strict: true })
+      : slugify(reqBody.name, { lower: true, strict: true });
+
+    if (newSlug !== categoryDoc.slug) {
+      if (await BlogCategory.isSlugTaken(newSlug)) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          "A category with this slug already exists."
+        );
+      }
+      categoryDoc["slug"] = newSlug;
     }
-    categoryDoc["slug"] = newSlug;
   }
 
   await categoryDoc.save();

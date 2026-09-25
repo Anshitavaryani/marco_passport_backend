@@ -13,7 +13,8 @@ const placeCategoryController = require('./placeCategory.controller');
 const placeController = require('./place.controller');
 const reviewController = require('./review.controller');
 const businessSubmissionController = require('./businessSubmission.controller');
-const passportController = require('./passport.controller')
+const passportController = require('./passport.controller');
+const mediaController = require('./media.controller')
 
 module.exports = {
     roleController,
@@ -30,5 +31,6 @@ module.exports = {
     placeController,
     reviewController,
     businessSubmissionController,
-    passportController
+    passportController,
+    mediaController
 };

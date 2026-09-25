@@ -11,11 +11,11 @@ const { validateResetPassordBody } = require("./common.middleware");
 
 const validateCreateAdminBody = catchAsync(async (req, res, next) => {
   const { name, email, password, role_id, department_id } = req.body;
-  if (!name || !email || !password || !role_id || !department_id) {
+  if (!name || !email || !role_id || !department_id) {
     return responseWrapper(
       res,
       "",
-      "Please Enter Required Fields : [name || email_id || password || role_id || department_id]",
+      "Please Enter Required Fields : [name || email_id ||  role_id || department_id]",
       httpStatus.BAD_REQUEST
     );
   }

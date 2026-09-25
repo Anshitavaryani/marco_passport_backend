@@ -33,7 +33,7 @@ const assertCategoriesValid = async (categoryIds, type) => {
   if (found.length !== categoryIds.length) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      "One or more category_ids are invalid or don't match this listing's type."
+      "One or more category_ids are invalid or don't match this listing's type.",
     );
   }
 };
@@ -77,7 +77,7 @@ const recalculatePlaceRating = async (placeId) => {
 
   await Place.update(
     { rating: avgRating, review_count: reviewCount },
-    { where: { id: placeId } }
+    { where: { id: placeId } },
   );
 };
 
@@ -88,21 +88,24 @@ const createPlace = async (reqBody) => {
   if (!VALID_TYPES.includes(type)) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      `Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`
+      `Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`,
     );
   }
 
   if (!name || !short_description) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      "Please enter required fields: [name, short_description]"
+      "Please enter required fields: [name, short_description]",
     );
   }
 
-  if (reqBody.price_level && !VALID_PRICE_LEVELS.includes(reqBody.price_level)) {
+  if (
+    reqBody.price_level &&
+    !VALID_PRICE_LEVELS.includes(reqBody.price_level)
+  ) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      `Invalid price_level. Must be one of: ${VALID_PRICE_LEVELS.join(", ")}`
+      `Invalid price_level. Must be one of: ${VALID_PRICE_LEVELS.join(", ")}`,
     );
   }
 
@@ -116,31 +119,46 @@ const createPlace = async (reqBody) => {
   if (await Place.isSlugTaken(slug)) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      "A listing with this slug already exists."
+      "A listing with this slug already exists.",
     );
   }
+
+  const parseBoolean = (value) => {
+    if (typeof value === "boolean") return value;
+
+    if (typeof value === "string") {
+      return value.toLowerCase() === "true";
+    }
+
+    return Boolean(value);
+  };
 
   const placeObj = {
     type,
     name,
     slug,
-    tagline: reqBody.tagline || null,
     short_description,
     about: reqBody.about || null,
     highlights: reqBody.highlights || null,
+    what_to_expect: reqBody.what_to_expect || null,
+    insider_tips: reqBody.insider_tips || null,
     featured_image: reqBody.featured_image || null,
     gallery_images: reqBody.gallery_images || null,
     address: reqBody.address || null,
     phone: reqBody.phone || null,
     email: reqBody.email || null,
     hours: reqBody.hours || null,
+    fees: reqBody.fees || null,
+    parking: reqBody.parking || null,
+    best_time_to_visit: reqBody.best_time_to_visit || null,
     website_url: reqBody.website_url || null,
     latitude: reqBody.latitude || null,
     longitude: reqBody.longitude || null,
     price_level: reqBody.price_level || null,
     neighborhood: reqBody.neighborhood || null,
-    is_featured: !!reqBody.is_featured,
-    is_top_pick: !!reqBody.is_top_pick,
+    is_featured: parseBoolean(reqBody.is_featured),
+    is_top_pick: parseBoolean(reqBody.is_top_pick),
+
     top_pick_rank: reqBody.top_pick_rank || null,
     created_by: reqBody.created_by || null,
   };
@@ -149,7 +167,7 @@ const createPlace = async (reqBody) => {
   if (!placeDoc) {
     throw new ApiError(
       httpStatus.INTERNAL_SERVER_ERROR,
-      "Failed to create new listing"
+      "Failed to create new listing",
     );
   }
 
@@ -162,35 +180,110 @@ const createPlace = async (reqBody) => {
 
 const updatePlace = async (reqBody, id) => {
   const placeDoc = await Place.findByPk(id);
+
   if (!placeDoc) {
     throw new ApiError(httpStatus.NOT_FOUND, "Listing not found");
   }
 
   const type = reqBody.type || placeDoc.type;
+
   if (reqBody.type && !VALID_TYPES.includes(reqBody.type)) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      `Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`
+      `Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`,
     );
   }
 
-  if (reqBody.price_level && !VALID_PRICE_LEVELS.includes(reqBody.price_level)) {
+  if (
+    reqBody.price_level &&
+    !VALID_PRICE_LEVELS.includes(reqBody.price_level)
+  ) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      `Invalid price_level. Must be one of: ${VALID_PRICE_LEVELS.join(", ")}`
+      `Invalid price_level. Must be one of: ${VALID_PRICE_LEVELS.join(", ")}`,
     );
   }
 
+  // -------------------------------------------------------------
+  // Name
+  // -------------------------------------------------------------
+
+  const nameChanged =
+    typeof reqBody.name !== "undefined" &&
+    reqBody.name !== "" &&
+    reqBody.name !== placeDoc.name;
+
+  if (nameChanged) {
+    placeDoc.name = reqBody.name;
+  }
+
+  // -------------------------------------------------------------
+  // Slug
+  //
+  // If slug is explicitly supplied -> use it.
+  // Otherwise, if name changed -> regenerate slug from name.
+  // -------------------------------------------------------------
+
+  const explicitSlug =
+    typeof reqBody.slug !== "undefined" && reqBody.slug !== "";
+
+  if (explicitSlug || nameChanged) {
+    const newSlug = explicitSlug
+      ? slugify(reqBody.slug, {
+          lower: true,
+          strict: true,
+        })
+      : slugify(reqBody.name, {
+          lower: true,
+          strict: true,
+        });
+
+    if (!newSlug) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        "Unable to generate a valid listing slug.",
+      );
+    }
+
+    if (newSlug !== placeDoc.slug) {
+      if (await Place.isSlugTaken(newSlug)) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          "A listing with this slug already exists.",
+        );
+      }
+
+      placeDoc.slug = newSlug;
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Other fields
+  // -------------------------------------------------------------
+
+  const parseBoolean = (value) => {
+    if (typeof value === "boolean") return value;
+
+    if (typeof value === "string") {
+      return value.toLowerCase() === "true";
+    }
+
+    return Boolean(value);
+  };
+
   const simpleFields = [
-    "name",
-    "tagline",
     "short_description",
     "about",
     "highlights",
+    "what_to_expect",
+    "insider_tips",
     "address",
     "phone",
     "email",
     "hours",
+    "fees",
+    "parking",
+    "best_time_to_visit",
     "website_url",
     "latitude",
     "longitude",
@@ -198,6 +291,7 @@ const updatePlace = async (reqBody, id) => {
     "neighborhood",
     "top_pick_rank",
   ];
+
   simpleFields.forEach((field) => {
     if (typeof reqBody[field] !== "undefined") {
       placeDoc[field] = reqBody[field];
@@ -211,28 +305,16 @@ const updatePlace = async (reqBody, id) => {
   if (typeof reqBody.gallery_images !== "undefined") {
     placeDoc.gallery_images = reqBody.gallery_images;
   }
-
   if (typeof reqBody.is_featured !== "undefined") {
-    placeDoc.is_featured = !!reqBody.is_featured;
+    placeDoc.is_featured = parseBoolean(reqBody.is_featured);
   }
 
   if (typeof reqBody.is_top_pick !== "undefined") {
-    placeDoc.is_top_pick = !!reqBody.is_top_pick;
+    placeDoc.is_top_pick = parseBoolean(reqBody.is_top_pick);
   }
 
   if (reqBody.type) {
     placeDoc.type = reqBody.type;
-  }
-
-  if (reqBody.slug) {
-    const newSlug = slugify(reqBody.slug, { lower: true, strict: true });
-    if (newSlug !== placeDoc.slug && (await Place.isSlugTaken(newSlug))) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        "A listing with this slug already exists."
-      );
-    }
-    placeDoc.slug = newSlug;
   }
 
   if (reqBody.updated_by) {
@@ -241,19 +323,21 @@ const updatePlace = async (reqBody, id) => {
 
   await placeDoc.save();
 
+  // -------------------------------------------------------------
+  // Categories
+  // -------------------------------------------------------------
+
   if (typeof reqBody.category_ids !== "undefined") {
     const categoryIds = parseCategoryIds(reqBody.category_ids);
+
     await assertCategoriesValid(categoryIds, type);
+
     await placeDoc.setCategories(categoryIds);
   }
 
   return findPlaceById(placeDoc.id);
 };
 
-// userId is optional — when provided (a logged-in visitor, via
-// attachUserIfPresent on the public routes), each place in the result
-// gets an is_in_passport boolean. Anonymous requests (userId
-// undefined) skip this entirely and just don't include the field.
 const getAllPlaces = async (filters = {}, userId) => {
   const type = filters.type || "business";
   const where = { is_active: true, type };

@@ -2,64 +2,68 @@ const bcrypt = require("bcrypt");
 const httpStatus = require("http-status");
 const jwt = require("jsonwebtoken");
 
-const { Admin } = require("../../models");
+const { Admin, Role } = require("../../models");
 const ApiError = require("../../utils/ApiError");
 const config = require("../../config/config");
 const { emailService } = require("../Common");
 const { otpTypes } = require("../../config/types");
 const generateOTP = require("../../utils/generateOTP");
+const { sendAdminCredentials } = require("../Common/email.service");
 
-// Admin OTPs are valid for 5 minutes, matching the window the user-side
-// OTP flow uses (otp.model.js's beforeValidate hook). Admin OTP state
-// lives directly on the Admin row (otp/is_otp_valid columns) rather than
-// the shared OTP table, so there's no otp_expiration_time column to
-// check against — this uses updated_at instead, which already bumps
-// automatically whenever sendOTP below writes a new otp value. Zero
-// migration needed, but it's a workaround: the OTP table already has
-// proper expiration built in, and having two parallel OTP
-// implementations (this one, and the user-side one) is worth
-// consolidating onto the OTP table properly at some point.
 const OTP_VALIDITY_MS = 5 * 60 * 1000;
 
 const createAdminUser = async (userBody) => {
-  const salt = bcrypt.genSaltSync(10);
-  const userObj = {
-    name: userBody.name,
-    email: userBody.email,
-    password: bcrypt.hashSync(userBody.password, salt),
-    role_id: userBody.role_id,
-    department_id: userBody.department_id,
-  };
-  const user = await Admin.create(userObj);
-  if (!user) {
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      "Failed to create User"
-    );
-  }
-  return user;
+	try {
+		const password = Math.random().toString(36).substring(2, 12);
+		let salt = bcrypt.genSaltSync(10);
+		const userObj = {
+			name: userBody.name,
+			email: userBody.email,
+			password: bcrypt.hashSync(password, salt),
+			role_id: userBody.role_id,
+			department_id: userBody.department_id,
+		};
+		const user = await Admin.create(userObj);
+
+		if (!user) {
+			throw new ApiError(
+				httpStatus.INTERNAL_SERVER_ERROR,
+				"Failed to create new admin",
+			);
+		}
+		let result = await Admin.findOne({
+			attributes: ["id", "name", "email", "role_id", "department_id"],
+			include: [
+				{
+					model: Role,
+					as: "admin_role",
+					attributes: ["id", "name", "abbreviation"],
+				},
+			
+			],
+
+			where: { id: user?.id, is_active: true },
+		});
+
+		let isSend = await sendAdminCredentials(userBody.email, password);
+		if (!isSend) {
+			throw new ApiError(
+				httpStatus.INTERNAL_SERVER_ERROR,
+				"Unable to send Credentials to This Email",
+			);
+		}
+		if (!result)
+			throw new ApiError(httpStatus.BAD_REQUEST, "Failed to Get Profile.");
+		return result;
+	} catch (error) {
+		throw new ApiError(
+			error.statusCode ? error.statusCode : httpStatus.INTERNAL_SERVER_ERROR,
+			error.message,
+		);
+	}
 };
 
-// Signs the JWT payload the same way for both admin auth entry points
-// (login and OTP-based password reset) — see the note above about why
-// this matters.
 const signAdminToken = (user, expiresIn) => {
-  // Was: jwt.sign(payload, Buffer.from(config.jwt.secret, 'hex'), {...})
-  // — the secret was never actually hex-encoded at any point, so
-  // wrapping it in Buffer.from(secret, 'hex') here (Node's hex decoder
-  // silently truncates at the first non-hex character rather than
-  // throwing) checked/produced a signature against a weakened,
-  // truncated version of the real secret rather than the real thing.
-  // This matched adminAuth.middleware.js's *original* verify code
-  // (which did the same truncation), so it was self-consistent, if
-  // cryptographically weak. That middleware's verify was fixed a few
-  // turns ago to use the plain secret — which means sign and verify no
-  // longer matched at all until this fix. Also switched the payload's
-  // `id` claim to `sub`, matching the JWT standard and the
-  // already-correct middleware (which reads payload.sub). Also
-  // dropped `is_backlisted: false` — it was hardcoded false at every
-  // signing site with no code path ever able to set it true, so it
-  // was pure decoration, not a real revocation mechanism.
   return jwt.sign(
     { sub: user.id, role_id: user.role_id, department_id: user.department_id },
     config.jwt.secret,
@@ -119,7 +123,6 @@ const sendOTP = async (email) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Invalid Email");
   }
 
-  // Was randomize('0', 6) — see utils/generateOTP.js for why.
   const generatedOTP = generateOTP(6);
   await emailService.sendForgotPasswordOTP(email, generatedOTP);
   await Admin.update(
@@ -146,9 +149,6 @@ const verifyOTP = async (email, otp, otp_type) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Invalid OTP Entered");
   }
 
-  // Was missing entirely — an admin OTP never expired once generated.
-  // See the OTP_VALIDITY_MS note above for why this uses updated_at
-  // rather than a dedicated expiration column.
   const otpAgeMs = Date.now() - new Date(user.updated_at).getTime();
   if (otpAgeMs > OTP_VALIDITY_MS) {
     throw new ApiError(
@@ -198,6 +198,104 @@ const forgotAdminPassword = async (reqBody) => {
   return "Password Changed Successfully.";
 };
 
+const getProfile = async (reqBody) => {
+  const { user } = reqBody;
+
+  const result = await Admin.findOne({
+    attributes: ["id", "name", "email", "role_id", "department_id"],
+    include: [
+      {
+        model: Role,
+        as: "admin_role",
+        attributes: ["id", "name", "abbreviation"],
+      },
+    ],
+    where: { id: user.id, is_active: true },
+  });
+
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Admin profile not found.");
+  }
+
+  return result;
+};
+
+const findAdminById = async (id) => {
+  const adminDoc = await Admin.findOne({
+    where: { id: id, is_active: true },
+    include: [
+      {
+        model: Role,
+        as: "admin_role",
+      },
+    ],
+  });
+  if (!adminDoc) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Admin not found.");
+  }
+  return adminDoc;
+};
+
+const updateAdmin = async (id, reqBody) => {
+  const adminDoc = await Admin.findOne({
+    where: { id: id, is_active: true },
+  });
+
+  if (!adminDoc) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Admin not found.");
+  }
+
+  if (
+    reqBody.name &&
+    reqBody.name !== "" &&
+    typeof reqBody.name !== "undefined"
+  ) {
+    adminDoc["name"] = reqBody.name;
+  }
+
+  if (
+    reqBody.email &&
+    reqBody.email !== "" &&
+    typeof reqBody.email !== "undefined"
+  ) {
+    adminDoc["email"] = reqBody.email;
+  }
+  if (
+    reqBody.role_id &&
+    reqBody.role_id !== "" &&
+    typeof reqBody.role_id !== "undefined"
+  ) {
+    adminDoc["role_id"] = reqBody.role_id;
+  }
+
+  await adminDoc.save();
+  return adminDoc;
+};
+
+const deleteAdmin = async (id) => {
+  const admin = await Admin.findOne({
+    where: { id: id, is_active: true },
+  });
+  if (!admin) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Admin not found");
+  }
+  await admin.destroy();
+  return true;
+};
+
+const getAllAdmins = async () => {
+  const userDoc = await Admin.findAll({
+    where: { is_active: true },
+    include: [
+      {
+        model: Role,
+        as: "admin_role",
+      },
+    ],
+  });
+  return userDoc;
+};
+
 module.exports = {
   createAdminUser,
   loginAdminUser,
@@ -205,4 +303,9 @@ module.exports = {
   sendOTP,
   verifyOTP,
   forgotAdminPassword,
+  getProfile,
+  findAdminById,
+  updateAdmin,
+  deleteAdmin,
+  getAllAdmins,
 };

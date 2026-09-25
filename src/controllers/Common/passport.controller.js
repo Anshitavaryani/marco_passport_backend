@@ -1,3 +1,5 @@
+/** @format */
+
 const httpStatus = require("http-status");
 
 const catchAsync = require("../../utils/catchAsync");
@@ -10,12 +12,7 @@ const addToPassport = catchAsync(async (req, res) => {
     req.body.place_id,
     req.body.visit_date
   );
-  return responseWrapper(
-    res,
-    entry,
-    "Added to your passport.",
-    httpStatus.CREATED
-  );
+  return responseWrapper(res, entry, "Added to your passport.", httpStatus.CREATED);
 });
 
 const getPassportList = catchAsync(async (req, res) => {
@@ -26,20 +23,15 @@ const getPassportList = catchAsync(async (req, res) => {
 const updateVisitDate = catchAsync(async (req, res) => {
   const entry = await passportService.updateVisitDate(
     req.body.user?.id,
-    req.params.id,
+    req.params.place_id,
     req.body.visit_date
   );
   return responseWrapper(res, entry, "Visit date updated.");
 });
 
 const removeFromPassport = catchAsync(async (req, res) => {
-  await passportService.removeFromPassport(req.body.user?.id, req.params.id);
-  return responseWrapper(
-    res,
-    "",
-    "Removed from your passport.",
-    httpStatus.OK
-  );
+  await passportService.removeFromPassport(req.body.user?.id, req.params.place_id);
+  return responseWrapper(res, "", "Removed from your passport.", httpStatus.OK);
 });
 
 module.exports = {

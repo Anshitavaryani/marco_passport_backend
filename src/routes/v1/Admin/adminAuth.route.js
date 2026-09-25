@@ -4,15 +4,6 @@ const router = express.Router();
 const { adminAuthController } = require("../../../controllers");
 const { adminAuthMiddleware, roleMiddleware } = require("../../../middlewares");
 
-// CRITICAL, now fixed: this had zero authentication — validateCreateAdminBody
-// only checks the request body's shape (required fields present, the
-// requested role_id isn't literally the super-admin role, email not
-// taken); it never checks who is making the request. That meant anyone,
-// with no login at all, could create a new Admin/SubAdmin/Engineer/
-// Editor account by POSTing here. Gated to super-admin-only, matching
-// the same tier as role management — creating admin accounts is exactly
-// the kind of operation that should require an existing super admin,
-// not be open to the internet.
 router.post(
   "/register",
   [
@@ -35,11 +26,40 @@ router.post(
   ],
   adminAuthController.resetAdminPassword
 );
-// otp / verify-otp / forgot-password correctly stay unauthenticated —
-// this is the admin "I forgot my password and can't log in" recovery
-// flow, which can't require a valid JWT by definition.
 router.post("/otp", adminAuthController.sendOTP);
 router.post("/verify-otp", adminAuthController.verifyOTP);
 router.post("/forgot-password", adminAuthController.forgotAdminPassword);
+
+// The logged-in admin's own profile — registered before the /:id
+// route below so "/profile" is never accidentally captured as a
+// dynamic :id.
+router.get(
+  "/profile",
+  [adminAuthMiddleware.validateJWTtoken],
+  adminAuthController.getProfile
+);
+
+// Admin management (viewing/editing/removing OTHER admin accounts) —
+// gated to super-admin only, matching /register's existing precedent.
+router.get(
+  "/all",
+  [adminAuthMiddleware.validateJWTtoken, roleMiddleware.isSuperAdmin],
+  adminAuthController.getAllAdmins
+);
+router.get(
+  "/:id",
+  [adminAuthMiddleware.validateJWTtoken, roleMiddleware.isSuperAdmin],
+  adminAuthController.findAdminById
+);
+router.put(
+  "/:id",
+  [adminAuthMiddleware.validateJWTtoken, roleMiddleware.isSuperAdmin],
+  adminAuthController.updateAdmin
+);
+router.delete(
+  "/:id",
+  [adminAuthMiddleware.validateJWTtoken, roleMiddleware.isSuperAdmin],
+  adminAuthController.deleteAdmin
+);
 
 module.exports = router;

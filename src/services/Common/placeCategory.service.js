@@ -70,6 +70,9 @@ const updateCategory = async (reqBody, id) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Place category not found.");
   }
 
+  // ---------------------------------------------------------
+  // Type
+  // ---------------------------------------------------------
   if (reqBody.type) {
     if (!VALID_TYPES.includes(reqBody.type)) {
       throw new ApiError(
@@ -77,15 +80,44 @@ const updateCategory = async (reqBody, id) => {
         `Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`
       );
     }
+
     categoryDoc.type = reqBody.type;
   }
 
-  if (reqBody.name) {
+  // ---------------------------------------------------------
+  // Name
+  // ---------------------------------------------------------
+  const nameChanged =
+    reqBody.name &&
+    typeof reqBody.name !== "undefined" &&
+    reqBody.name !== "" &&
+    reqBody.name !== categoryDoc.name;
+
+  if (nameChanged) {
     categoryDoc.name = reqBody.name;
   }
 
-  if (reqBody.slug) {
-    const newSlug = slugify(reqBody.slug, { lower: true, strict: true });
+  // ---------------------------------------------------------
+  // Slug
+  //
+  // If slug is explicitly provided, use it.
+  // Otherwise, if name changed, regenerate slug from new name.
+  // ---------------------------------------------------------
+  const explicitSlug =
+    reqBody.slug &&
+    typeof reqBody.slug !== "undefined" &&
+    reqBody.slug !== "";
+
+  if (explicitSlug || nameChanged) {
+    const newSlug = explicitSlug
+      ? slugify(reqBody.slug, {
+          lower: true,
+          strict: true,
+        })
+      : slugify(reqBody.name, {
+          lower: true,
+          strict: true,
+        });
 
     if (!newSlug) {
       throw new ApiError(
@@ -94,23 +126,28 @@ const updateCategory = async (reqBody, id) => {
       );
     }
 
-    if (
-      newSlug !== categoryDoc.slug &&
-      (await PlaceCategory.isSlugTaken(newSlug))
-    ) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        "A place category with this slug already exists."
-      );
-    }
+    if (newSlug !== categoryDoc.slug) {
+      if (await PlaceCategory.isSlugTaken(newSlug)) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          "A place category with this slug already exists."
+        );
+      }
 
-    categoryDoc.slug = newSlug;
+      categoryDoc.slug = newSlug;
+    }
   }
 
+  // ---------------------------------------------------------
+  // Image
+  // ---------------------------------------------------------
   if (typeof reqBody.image !== "undefined") {
     categoryDoc.image = reqBody.image;
   }
 
+  // ---------------------------------------------------------
+  // Active status
+  // ---------------------------------------------------------
   if (typeof reqBody.is_active !== "undefined") {
     categoryDoc.is_active = !!reqBody.is_active;
   }
@@ -146,10 +183,20 @@ const deleteCategory = async (id) => {
   const categoryDoc = await PlaceCategory.findByPk(Number(id));
 
   if (!categoryDoc) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Place category not found.");
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      "Place category not found."
+    );
   }
 
-  return await categoryDoc.destroy();
+  categoryDoc.is_active = false;
+  categoryDoc.slug_active = null;
+
+  await categoryDoc.save();
+
+  await categoryDoc.destroy();
+
+  return true;
 };
 
 module.exports = {

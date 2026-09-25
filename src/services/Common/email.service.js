@@ -77,8 +77,26 @@ const sendResetPasswordConfirmationMail = async (to) => {
   return sendEmail(to, subject, text);
 };
 
+const sendAdminCredentials = async (to, password) => {
+	const subject = "Welcome to  Marco Passport: Your Login Credentials";
+	const text = `Dear User,
+
+  Welcome to  Marco Passport! You have been successfully registered by our admin. Please find your login credentials below:
+
+  Email Address: ${to}
+  Temporary Password: ${password}
+
+  
+  For security reasons, we highly recommend changing your password after your first login. If you did not create this account, please ignore this email.
+  
+  Best Regards,
+  Marco Passport Team`;
+	return await sendEmail(to, subject, text);
+};
+
 module.exports = {
   sendForgotPasswordOTP,
   sendResetPasswordConfirmationMail,
   sendEmailVerification,
+  sendAdminCredentials
 };

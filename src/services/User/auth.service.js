@@ -42,16 +42,28 @@ const isValidTimezone = (tz) => {
 };
 
 // sendOTP / verifyOTP are kept fully intact and exported below, even
-// though nothing currently calls them — OTP-based email verification
-// is disabled site-wide for now (frontend captcha handles bot
-// prevention at signup instead), not removed. See the commented block
-// inside register() for how to turn it back on.
+// though nothing currently calls them for signup verification — OTP
+// email verification is disabled site-wide for now. forgot-password
+// still uses this same sendOTP/verifyOTP pair (see the type-based
+// branching inside verifyOTP), which is why the user-existence check
+// below matters even with signup verification off.
 const sendOTP = async (body, headers) => {
   const { email, type } = body;
   const { role_id } = headers;
 
   if (!validateEmail(email) || !Object.values(otpTypes).includes(type)) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid Email or Type.");
+  }
+
+  // Was missing — an OTP would previously get generated and emailed
+  // for any syntactically valid email regardless of whether an
+  // account with that email existed, and the OTP row never recorded
+  // which user it belonged to (user_id was omitted below). Restored.
+  const userDoc = await User.findOne({
+    where: { email: email, role_id: role_id },
+  });
+  if (!userDoc) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "User Not Found");
   }
 
   const existingOtp = await OTP.findOne({
@@ -65,6 +77,7 @@ const sendOTP = async (body, headers) => {
     code: generatedOTP,
     type: type,
     role_id: role_id,
+    user_id: userDoc.id,
   };
   const otpDoc = await OTP.create(otpObj);
   if (!otpDoc) {
@@ -128,10 +141,6 @@ const verifyOTP = async (email, otp, type, role_id) => {
   return token ? { token } : isUpdate;
 };
 
-// Signup collects only name/email/password/confirm_password now — no
-// mobile requirement, no OTP/email verification step. `mobile` is
-// still accepted if the caller happens to send it (kept nullable on
-// Profile), just no longer required or asked for by the frontend.
 const register = async (body, files, headers) => {
   const { name, email, mobile, password } = body;
   const { role_id } = headers;
@@ -140,10 +149,6 @@ const register = async (body, files, headers) => {
     email: email,
     password: bcrypt.hashSync(password, salt),
     role_id: role_id,
-    // OTP verification is disabled (see the commented block below), so
-    // there's no separate step left to flip this from PENDING to
-    // ACCEPTED — set directly here instead. Revert to the model's
-    // default (PENDING) if OTP verification is re-enabled.
     status: userStatusTypes.ACCEPTED,
   };
   const user = await User.create(userObj);
@@ -166,39 +171,6 @@ const register = async (body, files, headers) => {
       httpStatus.INTERNAL_SERVER_ERROR,
       "Failed to create New Record"
     );
-
-  // --- OTP / email verification — disabled for now, kept for later ---
-  // This site currently uses frontend captcha instead of an OTP
-  // verification step at signup, and `status` is set to ACCEPTED
-  // directly above. To re-enable this flow: uncomment the block below,
-  // change the status above back to the model's default (PENDING), and
-  // uncomment the /otp and /verify-otp routes in auth.route.js.
-  //
-  // const existingOtp = await OTP.findOne({
-  //   where: {
-  //     email: email,
-  //     type: otpTypes.EMAIL_VERIFICATION,
-  //     role_id: role_id,
-  //   },
-  // });
-  // if (existingOtp) await existingOtp.destroy({ force: true });
-  //
-  // const generatedOTP = generateOTP(4);
-  // const otpObj = {
-  //   user_id: user.id,
-  //   email: email,
-  //   code: generatedOTP,
-  //   type: otpTypes.EMAIL_VERIFICATION,
-  //   role_id: role_id,
-  // };
-  // const otpDoc = await OTP.create(otpObj);
-  // if (!otpDoc) {
-  //   throw new ApiError(
-  //     httpStatus.INTERNAL_SERVER_ERROR,
-  //     "Failed to generate new OTP."
-  //   );
-  // }
-  // await sendEmailVerification(email, generatedOTP);
 
   if (files) {
     for (const [field, fileType] of Object.entries(UPLOAD_FIELD_TYPES)) {

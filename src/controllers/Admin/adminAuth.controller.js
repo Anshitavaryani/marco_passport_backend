@@ -1,67 +1,74 @@
 const httpStatus = require("http-status");
+
 const catchAsync = require("../../utils/catchAsync");
 const { adminAuthService } = require("../../services");
 const responseWrapper = require("../../config/responseWrapper");
 
 const createAdminUser = catchAsync(async (req, res) => {
-  // Was discarding the created record (responseWrapper(res, '', ...))
-  // even though the service already returns it.
-  const admin = await adminAuthService.createAdminUser(req.body);
+  const response = await adminAuthService.createAdminUser(req.body);
   return responseWrapper(
     res,
-    admin,
-    "Admin Created Successfully.",
+    response,
+    "Admin created successfully",
     httpStatus.CREATED
   );
 });
 
 const loginAdminUser = catchAsync(async (req, res) => {
   const response = await adminAuthService.loginAdminUser(req.body);
-  return responseWrapper(res, response, "", httpStatus.OK);
+  return responseWrapper(res, response, "Successfully Logged in.");
 });
 
 const resetAdminPassword = catchAsync(async (req, res) => {
   const response = await adminAuthService.resetAdminPassword(req.body);
-  return responseWrapper(res, response, "", httpStatus.OK);
+  return responseWrapper(res, response, "Password changed Successfully.");
 });
 
 const sendOTP = catchAsync(async (req, res) => {
-  await adminAuthService.sendOTP(req.body.email);
-  return responseWrapper(
-    res,
-    "",
-    "OTP has been Sent To Your Email",
-    httpStatus.OK
-  );
+  const response = await adminAuthService.sendOTP(req.body.email);
+  return responseWrapper(res, response, "OTP has been sent to your email.");
 });
 
 const verifyOTP = catchAsync(async (req, res) => {
-  // Was:
-  //   if (!status) { responseWrapper(res, '', 'Ineternal Server Error', 500); };
-  //   responseWrapper(res, status, 'OTP has been verified', 200);
-  // Two bugs stacked: (1) no return/else between them, so whenever the
-  // first branch ran, execution fell straight through into the second
-  // responseWrapper call anyway — two responses sent on the same `res`,
-  // which throws "Cannot set headers after they are sent to the client".
-  // (2) the check itself was wrong: adminAuth.service.js's verifyOTP
-  // returns `token ? {token} : ''` — an empty string is a legitimate
-  // SUCCESS case (OTP verified, just not a FORGOT_PASSWORD type, so no
-  // token needed), not a failure. There's no actual failure return
-  // value from this service function — it either resolves normally
-  // (including the empty-string case) or throws, which catchAsync
-  // already forwards correctly. The check was checking the wrong thing
-  // entirely, not just missing a return.
-  const status = await adminAuthService.verifyOTP(
+  const response = await adminAuthService.verifyOTP(
     req.body.email,
     req.body.otp,
     req.body.otp_type
   );
-  return responseWrapper(res, status, "OTP has been verified", httpStatus.OK);
+  return responseWrapper(res, response, "OTP has been verified.");
 });
 
 const forgotAdminPassword = catchAsync(async (req, res) => {
   const response = await adminAuthService.forgotAdminPassword(req.body);
-  return responseWrapper(res, response, "", httpStatus.OK);
+  return responseWrapper(res, response, "Password changed Successfully.");
+});
+
+const getProfile = catchAsync(async (req, res) => {
+  const response = await adminAuthService.getProfile(req.body);
+  return responseWrapper(res, response, "Successfully fetched profile.");
+});
+
+const getAllAdmins = catchAsync(async (req, res) => {
+  const users = await adminAuthService.getAllAdmins();
+  return responseWrapper(res, users, "");
+});
+
+const findAdminById = catchAsync(async (req, res) => {
+  const adminDoc = await adminAuthService.findAdminById(req.params.id);
+  return responseWrapper(res, adminDoc, "");
+});
+
+const updateAdmin = catchAsync(async (req, res) => {
+  const response = await adminAuthService.updateAdmin(
+    req.params.id,
+    req.body
+  );
+  return responseWrapper(res, response, "Admin updated successfully.");
+});
+
+const deleteAdmin = catchAsync(async (req, res) => {
+  await adminAuthService.deleteAdmin(req.params.id);
+  return responseWrapper(res, "", "Deleted Successfully.", httpStatus.OK);
 });
 
 module.exports = {
@@ -71,4 +78,9 @@ module.exports = {
   sendOTP,
   verifyOTP,
   forgotAdminPassword,
+  getProfile,
+  getAllAdmins,
+  findAdminById,
+  updateAdmin,
+  deleteAdmin,
 };

@@ -1,3 +1,5 @@
+/** @format */
+
 const httpStatus = require("http-status");
 
 const { Passport, Place, PlaceCategory } = require("../../models");
@@ -19,7 +21,7 @@ const addToPassport = async (user_id, place_id, visit_date) => {
   if (existing) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      "This place is already in your passport."
+      "This item is already in your passport."
     );
   }
 
@@ -51,8 +53,8 @@ const getPassportList = async (user_id) => {
   });
 };
 
-const updateVisitDate = async (user_id, id, visit_date) => {
-  const entry = await Passport.findOne({ where: { id, user_id } });
+const updateVisitDate = async (user_id, place_id, visit_date) => {
+  const entry = await Passport.findOne({ where: { user_id, place_id } });
   if (!entry) {
     throw new ApiError(httpStatus.NOT_FOUND, "Passport entry not found.");
   }
@@ -61,8 +63,8 @@ const updateVisitDate = async (user_id, id, visit_date) => {
   return entry;
 };
 
-const removeFromPassport = async (user_id, id) => {
-  const entry = await Passport.findOne({ where: { id, user_id } });
+const removeFromPassport = async (user_id, place_id) => {
+  const entry = await Passport.findOne({ where: { user_id, place_id } });
   if (!entry) {
     throw new ApiError(httpStatus.NOT_FOUND, "Passport entry not found.");
   }

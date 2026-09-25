@@ -13,12 +13,24 @@ BlogCategory.init(
       type: DataTypes.STRING(100),
       allowNull: false,
     },
-    // Matches the URL-safe segment used in category filtering (e.g.
-    // "Local Guides" -> "local-guides"). Unique so two categories can't
-    // collide on the same public-facing slug.
+    // No longer unique:true here — a blanket unique constraint on this
+    // raw column blocked recreating a category with the same slug
+    // after a soft-delete, since the old (soft-deleted) row still
+    // physically exists with that slug. The real uniqueness constraint
+    // now lives on slug_active below, which is NULL for inactive rows
+    // and MySQL allows unlimited NULLs in a unique index.
     slug: {
       type: DataTypes.STRING(150),
       allowNull: false,
+    },
+    // Mirrors `slug` when the category is active, NULL when it isn't
+    // (see beforeSave/beforeDestroy below). This — not `slug` — is
+    // what actually carries the unique constraint, so a soft-deleted
+    // category's old slug doesn't block a new category from reusing
+    // it.
+    slug_active: {
+      type: DataTypes.STRING(150),
+      allowNull: true,
       unique: true,
     },
     is_active: {
@@ -53,13 +65,18 @@ BlogCategory.init(
 
 BlogCategory.isSlugTaken = async function (slug) {
   const existing = await this.findOne({
-    where: { slug, is_active: true },
+    where: { slug_active: slug },
   });
   return !!existing;
 };
 
+BlogCategory.beforeSave(async (category) => {
+  category.slug_active = category.is_active ? category.slug : null;
+});
+
 BlogCategory.beforeDestroy(async (category) => {
   category.is_active = false;
+  category.slug_active = null;
 });
 
 module.exports = BlogCategory;
