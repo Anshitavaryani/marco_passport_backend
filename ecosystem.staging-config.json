@@ -1,7 +1,7 @@
 {
   "apps": [
     {
-      "name": "priority-maintenance-back-end-staging",
+      "name": "themarcopassport-backend",
       "script": "index.js",
       "instances": 1,
       "exec_mode": "fork",
@@ -12,7 +12,6 @@
       "merge_logs": true,
       "kill_timeout": 12000,
       "listen_timeout": 8000,
-      "wait_ready": true,
       "env": {
         "NODE_ENV": "development"
       }

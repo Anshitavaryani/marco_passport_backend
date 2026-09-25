@@ -1,9 +1,9 @@
 {
   "apps": [
     {
-      "name": "priority-maintenance-back-end",
+      "name": "themarcopassport-backend",
       "script": "index.js",
-      "instances": "max",
+      "instances": 1,
       "exec_mode": "cluster",
       "autorestart": true,
       "watch": false,
@@ -12,7 +12,6 @@
       "merge_logs": true,
       "kill_timeout": 12000,
       "listen_timeout": 8000,
-      "wait_ready": true,
       "min_uptime": "10s",
       "max_restarts": 10,
       "env": {
