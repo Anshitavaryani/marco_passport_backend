@@ -4,16 +4,9 @@ const pick = require("../../utils/pick");
 const config = require("../../config/config");
 const responseWrapper = require("../../config/responseWrapper");
 
-// NOTE: the presence/emptiness checks below (limit/page/sortBy) don't
-// validate that a *provided* value is well-formed — e.g. ?sortBy=banana
-// passes straight through. That's fine: city.service.js already
-// validates the sort direction against an allow-list and falls back
-// safely on garbage limit/offset values. Left as-is rather than
-// duplicating that validation at this layer too.
+// city.service validates sortBy/limit/offset and falls back safely.
 const getAllCity = catchAsync(async (req, res) => {
-  const body = pick(req.body, []);
   const query = pick(req.query, ["sortBy", "limit", "page"]);
-  const params = pick(req.params, []);
 
   if (!query["limit"]) {
     query["limit"] = config.defaultLimit;
@@ -27,16 +20,12 @@ const getAllCity = catchAsync(async (req, res) => {
   const offset = (query["page"] - 1) * query["limit"];
   query["offset"] = offset;
 
-  const response = await cityService.getAllCity(body, query, params);
+  const response = await cityService.getAllCity(query);
   return responseWrapper(res, response, "");
 });
 
 const getCityById = catchAsync(async (req, res) => {
-  const body = pick(req.body, []);
-  const query = pick(req.query, ["sortBy", "limit", "page"]);
-  const params = pick(req.params, ["id"]);
-
-  const response = await cityService.getCityById(body, query, params);
+  const response = await cityService.getCityById(req.params.id);
   return responseWrapper(res, response, "");
 });
 

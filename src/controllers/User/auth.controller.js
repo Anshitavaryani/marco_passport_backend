@@ -2,38 +2,9 @@ const httpStatus = require("http-status");
 
 const validatePassword = require("../../helpers/validatePassword");
 const catchAsync = require("../../utils/catchAsync");
-const ApiError = require("../../utils/ApiError");
 const { userAuthService } = require("../../services");
 const pick = require("../../utils/pick");
 const responseWrapper = require("../../config/responseWrapper");
-
-const sendOTP = catchAsync(async (req, res) => {
-  const body = pick(req.body, ["email", "type"]);
-  const headers = pick(req.headers, ["role_id"]);
-  const response = await userAuthService.sendOTP(body, headers);
-  return responseWrapper(res, response, "OTP has been Sent To Your Email");
-});
-
-const verifyOTP = catchAsync(async (req, res) => {
-  const status = await userAuthService.verifyOTP(
-    req.body.email,
-    req.body.otp,
-    req.body.type,
-    req.headers.role_id
-  );
-  if (!status) {
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      "Unable to verify OTP — the associated account may no longer exist."
-    );
-  }
-  return responseWrapper(
-    res,
-    status,
-    "OTP has been verified. Please Create Your Profile.",
-    httpStatus.OK
-  );
-});
 
 const register = catchAsync(async (req, res) => {
   const body = pick(req.body, [
@@ -43,12 +14,29 @@ const register = catchAsync(async (req, res) => {
     "confirm_password",
   ]);
   const headers = pick(req.headers, ["role_id"]);
-  const response = await userAuthService.register(body, req.files, headers);
+  const response = await userAuthService.register(body, headers);
   return responseWrapper(
     res,
     response,
-    "User Created Successfully.",
+    "Account created. Check your email for a link to verify your account.",
     httpStatus.CREATED
+  );
+});
+
+const verifyEmail = catchAsync(async (req, res) => {
+  const response = await userAuthService.verifyEmail(req.body?.token, {
+    ip_address: req.ip,
+    timezone: req.headers.timezone,
+  });
+  return responseWrapper(res, response, "Email verified. You're now logged in.");
+});
+
+const resendVerification = catchAsync(async (req, res) => {
+  await userAuthService.resendVerification(req.body?.email, req.headers.role_id);
+  return responseWrapper(
+    res,
+    "",
+    "If that email has an unverified account, a new verification link is on its way."
   );
 });
 
@@ -57,14 +45,14 @@ const login = catchAsync(async (req, res) => {
   return responseWrapper(res, response, "Successfully Logged in.");
 });
 
-const resetPassword = catchAsync(async (req, res) => {
+const changePassword = catchAsync(async (req, res) => {
   const { new_password, confirm_password } = req.body;
 
   if (!validatePassword(new_password)) {
     return responseWrapper(
       res,
       "",
-      "Password should have a minimum length of 8 characters and must have at least 2 digits and No Blank Space",
+      userAuthService.PASSWORD_RULES_MESSAGE,
       httpStatus.BAD_REQUEST
     );
   }
@@ -78,13 +66,28 @@ const resetPassword = catchAsync(async (req, res) => {
     );
   }
 
-  const response = await userAuthService.resetPassword(req.body);
+  const response = await userAuthService.changePassword(req.body);
   return responseWrapper(res, response, "Password changed Successfully.");
 });
 
 const forgotPassword = catchAsync(async (req, res) => {
-  const response = await userAuthService.forgotPassword(req.body);
-  return responseWrapper(res, response, "Password changed Successfully.");
+  await userAuthService.forgotPassword(req.body?.email, req.headers.role_id);
+  return responseWrapper(
+    res,
+    "",
+    "If an account exists for that email, a password reset link is on its way."
+  );
+});
+
+const resetPassword = catchAsync(async (req, res) => {
+  await userAuthService.resetPassword(
+    pick(req.body || {}, ["token", "password", "confirm_password"])
+  );
+  return responseWrapper(
+    res,
+    "",
+    "Password changed successfully. Please log in with your new password."
+  );
 });
 
 const logout = catchAsync(async (req, res) => {
@@ -94,10 +97,11 @@ const logout = catchAsync(async (req, res) => {
 
 module.exports = {
   register,
+  verifyEmail,
+  resendVerification,
   login,
-  resetPassword,
-  sendOTP,
-  verifyOTP,
+  changePassword,
   forgotPassword,
+  resetPassword,
   logout,
 };

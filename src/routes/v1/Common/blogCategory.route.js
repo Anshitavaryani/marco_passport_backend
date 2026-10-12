@@ -4,7 +4,6 @@ const router = express.Router();
 const { blogCategoryController } = require("../../../controllers");
 const { adminAuthMiddleware, roleMiddleware } = require("../../../middlewares");
 
-// Mounted at /admin/blog-category.
 const requireAdmin = [
   adminAuthMiddleware.validateJWTtoken,
   roleMiddleware.isAdmin,

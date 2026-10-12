@@ -11,10 +11,6 @@ router.get(
   [userAuthMiddleware.verifyAuthJWTToken],
   userController.getProfile
 );
-// Was userController.notificationToogle (the typo) — user.controller.js
-// exports both spellings (an alias added specifically for this
-// situation), and this route file is the only confirmed consumer found
-// so far, so switching it to the corrected name now.
 router.post(
   "/notifications",
   [userAuthMiddleware.verifyAuthJWTToken],

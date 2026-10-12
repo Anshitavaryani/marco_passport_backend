@@ -13,14 +13,14 @@ const requireAdmin = [
 router.get("/", blogController.getAllBlogs);
 router.get("/category/:slug", blogController.getBlogsByCategorySlug);
 router.get("/:id", blogController.findBlogById);
-router.post("/", upload, requireAdmin, blogController.createBlog);
-router.put("/:id", upload, requireAdmin, blogController.updateBlog);
+router.post("/", requireAdmin, upload, blogController.createBlog);
+router.put("/:id", requireAdmin, upload, blogController.updateBlog);
 router.delete("/:id", requireAdmin, blogController.deleteBlog);
 
 
 router.post(
   "/upload-image",
-  [upload, adminAuthMiddleware.validateJWTtoken],
+  [adminAuthMiddleware.validateJWTtoken, upload],
   mediaController.uploadImage
 );
 

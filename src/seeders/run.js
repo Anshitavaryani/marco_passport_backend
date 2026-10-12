@@ -3,7 +3,7 @@
 // `npm run seed` has something to invoke.
 //
 // Loads reference data (roles, departments, countries, states, cities,
-// categories, timezones) from src/seeders/dumps/*.sql into the database.
+// timezones) from src/seeders/dumps/*.sql into the database.
 // Run this AFTER `npm run sync` (tables must exist first) and typically
 // after `npm run migrate` too. Without this, every FK-backed lookup
 // (role_id, department_id, country_id, etc.) has nothing to reference —

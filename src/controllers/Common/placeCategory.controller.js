@@ -32,16 +32,12 @@ const findCategoryById = catchAsync(async (req, res) => {
   return responseWrapper(res, categoryDoc, "");
 });
 
-// Route applies multer BEFORE requireAdmin — same reasoning as
-// blog.route.admin.js — so req.files/req.body are both populated
-// correctly by the time this runs.
 const createCategory = catchAsync(async (req, res) => {
   const category = await placeCategoryService.createCategory({
     ...req.body,
     image: req.files?.images?.[0]
       ? `/images/${req.files.images[0].filename}`
       : req.body.image,
-    created_by: req.body.user?.id,
   });
 
   return responseWrapper(
@@ -59,7 +55,6 @@ const updateCategory = catchAsync(async (req, res) => {
       image: req.files?.images?.[0]
         ? `/images/${req.files.images[0].filename}`
         : req.body.image,
-      updated_by: req.body.user?.id,
     },
     req.params.id
   );

@@ -14,16 +14,8 @@ Timezone.init(
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-    // NOTE: current_local_time / current_utc_offset /
-    // is_day_light_saving_active look like a one-time snapshot from
-    // whatever seeded timezones.sql, not something kept live-updated by
-    // any cron/job in this codebase. DST offsets change through the
-    // year, so these likely drift stale over time. auth.service.js's
-    // saveLoginTiming (reviewed earlier) doesn't actually read these
-    // columns — it just uses this table to resolve an id FK and does its
-    // own live timezone conversion separately — so this is probably
-    // harmless dead data rather than something actively relied on, but
-    // worth confirming nothing else reads these expecting them to be current.
+    // The current_* / *_day_light_saving columns are a snapshot from
+    // timezones.sql and are not kept up to date; nothing reads them.
     current_local_time: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -73,10 +65,6 @@ Timezone.init(
     deletedAt: "deleted_at",
   }
 );
-
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
-// It also shadowed the outer `Timezone` class with its own parameter
-// (`(Timezone) => {...}`), fixed below by lowercasing.
 
 Timezone.beforeDestroy(async (timezone) => {
   timezone.is_active = false;

@@ -4,9 +4,8 @@ const logger = require("./logger.js");
 
 const sequelizeOptions = {
   host: config.databases.central.host,
-  port: config.databases.central.port, // was missing — silently fell back to MySQL's default 3306
+  port: config.databases.central.port,
   dialect: "mysql",
-  supportBigNumbers: true,
   collate: "utf8mb4_unicode_ci",
   timezone: "+00:00", // store/convert dates in UTC regardless of server TZ
   dialectOptions: {
@@ -30,8 +29,7 @@ const sequelize = new Sequelize(
 );
 
 // The primary DB is not optional — nothing in this app works without it.
-// Retry a few times (handles the common case of the app container starting
-// slightly before the DB is ready to accept connections), then fail fast
+// Retry a few times (the DB may still be starting), then fail fast
 // rather than silently serving traffic against a dead DB connection.
 const MAX_ATTEMPTS = 5;
 const RETRY_DELAY_MS = 3000;

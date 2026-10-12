@@ -26,9 +26,6 @@ const updateContactUs = async (reqBody, id) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Data not found");
   }
 
-  // Simplified: `reqBody.email && typeof reqBody.email !== 'undefined' && reqBody.email !== ''`
-  // — the typeof check was redundant, `reqBody.email &&` already
-  // short-circuits on undefined before typeof is ever reached.
   if (reqBody.email) contactUsDoc.email = reqBody.email;
   if (reqBody.address) contactUsDoc.address = reqBody.address;
   if (reqBody.mobile) contactUsDoc.mobile = reqBody.mobile;

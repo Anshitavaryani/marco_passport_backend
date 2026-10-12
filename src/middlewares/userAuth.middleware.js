@@ -1,10 +1,10 @@
 const httpStatus = require("http-status");
 const jwt = require("jsonwebtoken");
 
-const { User, OTP, UserToken, Profile } = require("../models");
+const { User, UserToken, Profile } = require("../models");
 const validateEmail = require("../helpers/validateEmail");
 const validatePassword = require("../helpers/validatePassword");
-const { tokenTypes, otpTypes } = require("../config/types");
+const { tokenTypes, userStatusTypes } = require("../config/types");
 const catchAsync = require("../utils/catchAsync");
 const config = require("../config/config");
 const responseWrapper = require("../config/responseWrapper");
@@ -43,13 +43,16 @@ const validateRegisterUserBody = catchAsync(async (req, res, next) => {
     );
   }
 
-  if (await User.isEmailTaken(email, role_id)) {
-    return responseWrapper(
-      res,
-      "",
-      "Email already taken",
-      httpStatus.BAD_REQUEST
-    );
+  const existing = await User.findOne({
+    where: { email, role_id, is_active: true },
+    attributes: ["id", "status"],
+  });
+  if (existing) {
+    const message =
+      existing.status === userStatusTypes.PENDING
+        ? "This email is registered but not verified yet. Check your inbox or request a new verification email."
+        : "Email already taken";
+    return responseWrapper(res, "", message, httpStatus.BAD_REQUEST);
   }
 
   if (!validatePassword(password)) {
@@ -126,7 +129,13 @@ const verifyAuthJWTToken = catchAsync(async (req, res, next) => {
   });
 
   if (!tokenDoc) {
-    return responseWrapper(res, "", "Token Not Found", httpStatus.BAD_REQUEST);
+    // Logged out, or revoked by a password reset.
+    return responseWrapper(
+      res,
+      "",
+      "Session expired. Please log in again.",
+      httpStatus.UNAUTHORIZED
+    );
   }
 
   const user = await User.findOne({
@@ -159,20 +168,9 @@ const verifyAuthJWTToken = catchAsync(async (req, res, next) => {
   next();
 });
 
-// Optional auth — for PUBLIC routes that want to personalize their
-// response for a logged-in visitor without requiring login. Unlike
-// verifyAuthJWTToken, this never blocks the request: no token, an
-// expired token, or an invalid token all just fall through with
-// req.body.user left unset, and the route behaves exactly as it would
-// for a fully anonymous visitor.
-//
-// req.body is guarded RIGHT HERE, before the no-token early return —
-// not just in the success path further down. A GET request with no
-// token never gets any body-parsing middleware to run at all, so
-// req.body is genuinely undefined at this point; downstream
-// controllers reading req.body.user?.id would crash on req.body
-// itself (not just .user) if this function returned early without
-// first making sure req.body is at least an empty object.
+// Optional auth for public routes: an invalid, expired or missing token
+// never blocks the request; req.body.user is just left unset.
+// req.body is created up front because GET requests have no parsed body.
 const attachUserIfPresent = async (req, res, next) => {
   if (!req.body) req.body = {};
 
@@ -200,61 +198,13 @@ const attachUserIfPresent = async (req, res, next) => {
     if (user) {
       req.body.user = user;
     }
-  } catch (jwtError) {
+  } catch {
     // Expired/invalid token on an optional-auth route — proceed
     // anonymously rather than rejecting the request.
   }
 
   next();
 };
-
-const validateForgetPassordToken = catchAsync(async (req, res, next) => {
-  const { email, password, confirm_password, token } = req.body || {};
-  const { role_id } = req.headers;
-
-  if (!email || !password || !confirm_password || !token) {
-    return responseWrapper(
-      res,
-      "",
-      "Please Enter Required Fields : [ email || new_password || confirm_password || token ]",
-      httpStatus.BAD_REQUEST
-    );
-  }
-
-  const userDoc = await User.findOne({
-    where: { email: email, is_active: true, role_id: role_id },
-  });
-  if (!userDoc) {
-    return responseWrapper(
-      res,
-      "",
-      "User With This Email Id Not Found.",
-      httpStatus.BAD_REQUEST
-    );
-  }
-
-  const otpDoc = await OTP.findOne({
-    where: {
-      email: email,
-      code: token,
-      is_verified: true,
-      type: otpTypes.FORGOT_PASSWORD,
-      role_id: role_id,
-    },
-  });
-  if (!otpDoc) {
-    return responseWrapper(
-      res,
-      "",
-      "Forget Password Token is not Valid.",
-      httpStatus.BAD_REQUEST
-    );
-  }
-
-  req.body.user = userDoc;
-  req.body.otpDoc = otpDoc;
-  next();
-});
 
 const setRoleIdIfNotPresent = (req, res, next) => {
   if (!req.headers.role_id) {
@@ -269,6 +219,5 @@ module.exports = {
   attachUserIfPresent,
   validateResetPassordBody,
   setRoleIdIfNotPresent,
-  validateForgetPassordToken,
   validateSignInReqBody,
 };

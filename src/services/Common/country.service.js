@@ -6,7 +6,7 @@ const config = require("../../config/config");
 
 const VALID_SORT_DIRECTIONS = ["ASC", "DESC"];
 
-const getAllCountry = async (body, query, params) => {
+const getAllCountry = async (query) => {
   const limit = parseInt(query.limit, 10) || config.defaultLimit;
   const offset = parseInt(query.offset, 10) || 0;
   const sortDirection = VALID_SORT_DIRECTIONS.includes(
@@ -25,13 +25,7 @@ const getAllCountry = async (body, query, params) => {
   return result;
 };
 
-const getCountryId = async (body, query, params) => {
-  // CRITICAL BUG, now fixed: this was hardcoded to `id: 233` with the
-  // actual intended filter (`id: params.id`) commented out directly
-  // above it — meaning GET /country/:id returned the same single
-  // country (whatever id 233 happens to be in your seed data) no
-  // matter what id was actually requested. Looks like a debugging
-  // leftover that never got reverted.
+const getCountryId = async (id) => {
   const result = await Country.findOne({
     attributes: ["id", "name"],
     include: [
@@ -41,7 +35,7 @@ const getCountryId = async (body, query, params) => {
         attributes: ["id", "name", "country_id"],
       },
     ],
-    where: { is_active: 1, id: params.id },
+    where: { is_active: 1, id },
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, "Country not found.");

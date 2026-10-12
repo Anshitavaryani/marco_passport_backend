@@ -1,6 +1,8 @@
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { addMinutes } = require("date-fns");
 const httpStatus = require("http-status");
+const { Op } = require("sequelize");
 
 const config = require("../../config/config");
 const { UserToken } = require("../../models");
@@ -25,13 +27,6 @@ const generateToken = (
 };
 
 const saveToken = async (token, userId, expires, type, role_id) => {
-  // Was a raw `INSERT INTO user_tokens (...) VALUES ('${userId}', ...)`
-  // built with template-string interpolation — string-concatenating
-  // request-adjacent values directly into SQL is a SQL-injection
-  // surface waiting to be exploited the moment any of these values
-  // ever comes from less-trusted input than they currently do.
-  // UserToken was already imported here but unused for this — the ORM
-  // method is no more code and removes the raw-SQL surface entirely.
   const tokenDoc = await UserToken.create({
     user_id: userId,
     token_type: type,
@@ -42,52 +37,11 @@ const saveToken = async (token, userId, expires, type, role_id) => {
   return tokenDoc;
 };
 
-const verifyToken = async (token, type) => {
-  let payload;
-  try {
-    payload = jwt.verify(token, config.jwt.secret);
-  } catch (jwtError) {
-    const message =
-      jwtError.name === "TokenExpiredError"
-        ? "Token has expired. Please log in again."
-        : "Invalid Token";
-    throw new ApiError(httpStatus.UNAUTHORIZED, message);
-  }
-
-  const tokenDoc = await UserToken.findOne({
-    where: {
-      token: token,
-      token_type: type,
-      user_id: payload.sub,
-    },
-  });
-  if (!tokenDoc) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Token not found");
-  }
-  if (tokenDoc.expired_at < new Date()) {
-    throw new ApiError(
-      httpStatus.UNAUTHORIZED,
-      "Token is expired. Please log in again."
-    );
-  }
-  return tokenDoc;
-};
-
 const generateAuthTokens = async (user) => {
   if (!user) {
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, "Error: Invalid User");
   }
 
-  // Fixed a real bug: this used to be
-  //   moment().add(config.jwt.accessExpirationMinutes, 'days')
-  // — adding a value that's named, documented, and configured as
-  // MINUTES (JWT_ACCESS_EXPIRATION_MINUTES) using a DAYS unit. Access
-  // tokens were living ~720x longer than intended (a token configured
-  // for 30 minutes was actually expiring in 30 days) — a real
-  // undermining of the whole point of a short-lived access token.
-  // (This pairs with an earlier fix in config.js, which was reading a
-  // nonexistent env var and left this value `undefined` before that —
-  // so this completes that fix rather than duplicating it.)
   const accessTokenExpires = addMinutes(
     new Date(),
     config.jwt.accessExpirationMinutes
@@ -121,9 +75,69 @@ const generateAuthTokens = async (user) => {
   };
 };
 
+// ---------------------------------------------------------------------
+// Single-use email-link tokens (verify email, reset password).
+// The raw token only ever goes into the emailed link; the DB stores its
+// SHA-256 hash, so a leaked user_tokens table can't be used to log in.
+// ---------------------------------------------------------------------
+const hashToken = (raw) => crypto.createHash("sha256").update(raw).digest("hex");
+
+// Replaces any previous token of the same type, so only the latest link works.
+const createOneTimeToken = async (user, type, ttlMs, transaction) => {
+  await UserToken.destroy({
+    where: { user_id: user.id, token_type: type },
+    force: true,
+    transaction,
+  });
+  const raw = crypto.randomBytes(32).toString("hex");
+  await UserToken.create(
+    {
+      user_id: user.id,
+      role_id: user.role_id,
+      token_type: type,
+      token: hashToken(raw),
+      expired_at: new Date(Date.now() + ttlMs),
+    },
+    { transaction }
+  );
+  return raw;
+};
+
+const findValidOneTimeToken = async (raw, type) => {
+  if (typeof raw !== "string" || !/^[a-f0-9]{64}$/.test(raw)) return null;
+  return UserToken.findOne({
+    where: {
+      token: hashToken(raw),
+      token_type: type,
+      is_active: true,
+      expired_at: { [Op.gt]: new Date() },
+    },
+  });
+};
+
+// Throttle for "send me another email" endpoints.
+const wasTokenIssuedRecently = async (userId, type, withinMs) => {
+  const count = await UserToken.count({
+    where: {
+      user_id: userId,
+      token_type: type,
+      created_at: { [Op.gt]: new Date(Date.now() - withinMs) },
+    },
+  });
+  return count > 0;
+};
+
+const revokeTokens = async (userId, type, transaction) =>
+  UserToken.destroy({
+    where: { user_id: userId, token_type: type },
+    force: true,
+    transaction,
+  });
+
 module.exports = {
-  generateToken,
-  saveToken,
-  verifyToken,
   generateAuthTokens,
+  createOneTimeToken,
+  findValidOneTimeToken,
+  wasTokenIssuedRecently,
+  revokeTokens,
 };

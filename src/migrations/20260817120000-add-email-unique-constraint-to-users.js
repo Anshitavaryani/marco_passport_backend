@@ -26,10 +26,15 @@ module.exports = {
     // a beforeSave hook in user.model.js. Adding an ordinary column is
     // a fast, non-rebuilding operation in MySQL 8, sidestepping this
     // class of bug entirely.
-    await queryInterface.addColumn('users', 'email_role_active_key', {
-      type: Sequelize.STRING(210),
-      allowNull: true,
-    });
+    // Guarded: `npm run sync` now creates this column/index from the model
+    // (the model defines them), so on a fresh DB they may already exist.
+    const columns = await queryInterface.describeTable('users');
+    if (!columns.email_role_active_key) {
+      await queryInterface.addColumn('users', 'email_role_active_key', {
+        type: Sequelize.STRING(210),
+        allowNull: true,
+      });
+    }
 
     // Backfill existing rows so the unique index below doesn't choke on
     // NULLs where a real key should exist (only genuinely soft-deleted
@@ -42,11 +47,14 @@ module.exports = {
       END;
     `);
 
-    await queryInterface.addIndex('users', {
-      fields: ['email_role_active_key'],
-      unique: true,
-      name: 'users_email_role_active_unique',
-    });
+    const indexes = await queryInterface.showIndex('users');
+    if (!indexes.some((index) => index.name === 'users_email_role_active_unique')) {
+      await queryInterface.addIndex('users', {
+        fields: ['email_role_active_key'],
+        unique: true,
+        name: 'users_email_role_active_unique',
+      });
+    }
   },
 
   async down(queryInterface, Sequelize) {

@@ -26,9 +26,6 @@ const init = async () => {
   try {
     await sequelize.sync({ alter: true });
     logger.info("Table alteration completed.");
-    // To seed initial data after altering, uncomment:
-    // const initialSeedData = require('../seeders/execution');
-    // await initialSeedData(sequelize);
     process.exit(0);
   } catch (error) {
     logger.error(`Failed to alter tables: ${error.message}`);

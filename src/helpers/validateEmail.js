@@ -11,11 +11,6 @@ const validateEmail = (email) => {
     return false;
   }
 
-  // Was `.match(...)`, which returns null or a match array — not a
-  // boolean. Every current call site uses `!validateEmail(x)`, which
-  // works fine via truthy coercion, but a function named validateEmail
-  // should actually return true/false rather than leave that as an
-  // implementation detail. .test() does.
   return EMAIL_REGEX.test(str);
 };
 

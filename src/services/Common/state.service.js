@@ -6,7 +6,7 @@ const config = require("../../config/config");
 
 const VALID_SORT_DIRECTIONS = ["ASC", "DESC"];
 
-const getAllState = async (body, query, params) => {
+const getAllState = async (query) => {
   const limit = parseInt(query.limit, 10) || config.defaultLimit;
   const offset = parseInt(query.offset, 10) || 0;
   const sortDirection = VALID_SORT_DIRECTIONS.includes(
@@ -25,7 +25,7 @@ const getAllState = async (body, query, params) => {
   return result;
 };
 
-const getStateById = async (body, query, params) => {
+const getStateById = async (id) => {
   const result = await State.findOne({
     attributes: ["id", "name"],
     include: [
@@ -40,7 +40,7 @@ const getStateById = async (body, query, params) => {
         attributes: ["id", "name"],
       },
     ],
-    where: { is_active: 1, id: params.id },
+    where: { is_active: 1, id },
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, "State not found.");

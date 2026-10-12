@@ -56,14 +56,7 @@ userLoginTiming.init(
         key: "id",
       },
     },
-    // NOTE: this is a foreign key (references timezones.id — see
-    // auth.service.js's saveLoginTiming, which stores timeZoneDoc.id
-    // here), but every other FK column in this codebase uses an `_id`
-    // suffix (role_id, user_id, country_id, token_id, etc). `time_zone`
-    // reads like it might hold a name/string, not an id. Not renaming —
-    // that's a persisted column name needing a coordinated migration —
-    // just flagging the inconsistency (rename to timezone_id would match
-    // the rest of the schema).
+    // FK to timezones.id despite the name (renaming needs a migration).
     time_zone: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -105,10 +98,6 @@ userLoginTiming.init(
     deletedAt: "deleted_at",
   }
 );
-
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
-// It also shadowed the outer `userLoginTiming` class with its own
-// parameter (`(userLoginTiming) => {...}`), fixed below.
 
 userLoginTiming.beforeDestroy(async (loginTiming) => {
   loginTiming.is_active = false;

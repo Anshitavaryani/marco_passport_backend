@@ -49,13 +49,7 @@ Admin.init(
       type: DataTypes.STRING,
       allowNull: true,
     },
-    // NOTE: otp / is_otp_valid / remember_token don't appear to be
-    // referenced anywhere in adminAuth.middleware.js or the parts of
-    // adminAuth.service.js reviewed so far — the admin-side auth flow
-    // uses JWT + this same Admin table, with no separate token table.
-    // These look like leftovers from an earlier OTP-based admin auth
-    // design that was superseded. Flagging rather than removing, since I
-    // haven't seen every consumer of the Admin model yet.
+    // otp / is_otp_valid / remember_token back the admin forgot-password flow.
     otp: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -97,6 +91,11 @@ Admin.init(
       type: DataTypes.DATE,
       allowNull: true,
     },
+    // email while the row is live, NULL once soft-deleted; unique-indexed.
+    email_active_key: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
   },
   {
     sequelize,
@@ -107,38 +106,27 @@ Admin.init(
     createdAt: "created_at",
     updatedAt: "updated_at",
     deletedAt: "deleted_at",
+    indexes: [
+      {
+        unique: true,
+        fields: ["email_active_key"],
+        name: "admins_email_active_unique",
+      },
+    ],
   }
 );
 
-Admin.afterCreate(async (admin) => {
-  const socketId = `${admin.role_id}-${admin.id}-${admin.department_id}-socketId`;
-  admin.socket_id = socketId;
-  await admin.save();
-});
-
-// NOTE: scoped only by email, unlike User.isEmailTaken(email, role_id).
-// Means admin email uniqueness is global across the whole admin
-// hierarchy (SUP_ADM/ADM/SUB_ADM/ENG/EDTR all share one namespace), vs.
-// User's per-role scoping. Plausibly intentional (internal staff vs.
-// external customers), flagging so it's a deliberate choice rather than
-// an inherited inconsistency.
+// Admin emails are unique across all admin roles (users are per-role).
 Admin.isEmailTaken = async function (email) {
   let u = await this.findOne({ where: { email: email, is_active: true } });
   return !!u;
 };
 
-// Removed: a beforeUpdate hook that manually set updated_at to a
-// hand-formatted string. Redundant three times over — Sequelize's own
-// timestamps:true + updatedAt:'updated_at' already does this with a real
-// Date, and the column itself has onUpdate: Sequelize.literal('CURRENT_TIMESTAMP')
-// telling MySQL to do it at the DB level regardless. This pattern was
-// identical across every model in this codebase; removed everywhere.
-
 Admin.beforeDestroy(async (admin) => {
-  // deleted_at itself is handled automatically by paranoid:true — no
-  // need to set it manually here (that line was removed). is_active
-  // is NOT managed by paranoid mode though, so this is worth keeping.
+  // paranoid:true handles deleted_at; is_active has to be kept in sync here.
+  // Soft delete saves with hooks off, so beforeSave won't clear the key.
   admin.is_active = false;
+  admin.email_active_key = null;
 });
 
 Admin.beforeSave(async (admin) => {

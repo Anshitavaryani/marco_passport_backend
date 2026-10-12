@@ -46,17 +46,7 @@ const updateRole = async (reqBody, id) => {
   return roleDoc;
 };
 
-// Confirmed: this takes a Role's own primary key directly — findByPk(id)
-// — not a user id resolved via a join. This settles the open question
-// from role.middleware.js: req.user.role_id (what's implemented there)
-// is correct, not req.user.sub.
-//
-// NOTE: unlike User.isEmailTaken/isUserNameTaken elsewhere, this doesn't
-// filter is_active. paranoid:true already excludes soft-deleted roles
-// from findByPk automatically, so a deleted role is safely excluded
-// either way — but if a role can ever be marked is_active:false WITHOUT
-// being soft-deleted (nothing currently does this), this would still
-// return it. Flagging in case that becomes a real code path later.
+// Takes the role's own primary key; paranoid:true excludes deleted roles.
 const findRoleById = async (id) => {
   const isRoleIdValid = await Role.findByPk(id);
   return isRoleIdValid;

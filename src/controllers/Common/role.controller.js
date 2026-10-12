@@ -32,7 +32,6 @@ const getAllRoles = catchAsync(async (req, res) => {
 
 const findRoleById = catchAsync(async (req, res) => {
   const roleDoc = await roleService.findRoleById(req.params.id);
-  // Was missing — a nonexistent id came back as a 200 with data:null.
   if (!roleDoc) {
     throw new ApiError(httpStatus.NOT_FOUND, "Role not found.");
   }

@@ -1,14 +1,15 @@
 const app = require('./app.js');
-const moment = require('moment');
 const config = require('./src/config/config.js');
 const logger = require('./src/config/logger.js');
+const { scheduleCleanupUnverifiedUsers } = require('./src/jobs/cleanupUnverifiedUsers.js');
 
 process.env.TZ = config.DEFAULT_TIMEZONE;
 
 const server = app.listen(config.port, () => {
-  const currentTime = moment().format('YYYY-MM-DD HH:mm:ss');
-  logger.info(`Server running on port ${config.port} | Time: ${currentTime}`);
+  logger.info(`Server running on port ${config.port}`);
 });
+
+scheduleCleanupUnverifiedUsers();
 
 // graceful shutdown
 const exitHandler = () => {

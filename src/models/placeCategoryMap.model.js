@@ -12,10 +12,7 @@ PlaceCategoryMap.init(
     place_id: {
       type: DataTypes.BIGINT.UNSIGNED,
       allowNull: false,
-      // CASCADE here (not RESTRICT, unlike most FKs elsewhere in this
-      // app) is deliberate: this is a pure join table. If a place or
-      // category is ever hard-deleted, the mapping rows have no reason
-      // to survive on their own — they're not independent data.
+      // Pure join table: mapping rows go away with their place/category.
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
       references: {
@@ -48,9 +45,7 @@ PlaceCategoryMap.init(
     tableName: "place_category_map",
     timestamps: true,
     underscored: true,
-    // No paranoid: true here — see the note above the model. Removing a
-    // category tag from a place is a real deletion, not something this
-    // app needs to soft-delete/undo.
+    // Not paranoid: removing a category tag is a real delete.
     createdAt: "created_at",
     updatedAt: "updated_at",
     indexes: [

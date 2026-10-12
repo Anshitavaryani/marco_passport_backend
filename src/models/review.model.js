@@ -19,9 +19,7 @@ Review.init(
         key: "id",
       },
     },
-    // Reviews come from logged-in Passport users, not admins — this
-    // references users.id, matching the "Add to Passport requires
-    // login" flow already established for this feature.
+    // Reviews are written by logged-in users (users.id), not admins.
     user_id: {
       type: DataTypes.BIGINT.UNSIGNED,
       allowNull: false,

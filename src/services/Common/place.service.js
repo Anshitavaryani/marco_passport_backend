@@ -2,7 +2,13 @@ const httpStatus = require("http-status");
 const slugify = require("slugify");
 const { Op, fn, col } = require("sequelize");
 
-const { Place, PlaceCategory, Review, Passport } = require("../../models");
+const {
+  Place,
+  PlaceCategory,
+  Review,
+  Itinerary,
+  ItineraryItem,
+} = require("../../models");
 const config = require("../../config/config");
 const ApiError = require("../../utils/ApiError");
 
@@ -60,6 +66,25 @@ const getSortOrder = (type, sort) => {
   }
 };
 
+// Which of these places are already in any of the user's itineraries.
+const placeIdsInUserItineraries = async (userId, placeIds) => {
+  if (!placeIds.length) return new Set();
+  const rows = await ItineraryItem.findAll({
+    where: { place_id: placeIds },
+    attributes: ["place_id"],
+    include: [
+      {
+        model: Itinerary,
+        as: "itinerary",
+        where: { user_id: userId },
+        attributes: [],
+      },
+    ],
+    raw: true,
+  });
+  return new Set(rows.map((row) => row.place_id));
+};
+
 const recalculatePlaceRating = async (placeId) => {
   const result = await Review.findOne({
     where: { place_id: placeId, is_active: true },
@@ -92,10 +117,13 @@ const createPlace = async (reqBody) => {
     );
   }
 
-  if (!name || !short_description) {
+  // The address is what itinerary maps use to place the pin, so every
+  // listing needs one.
+  const address = typeof reqBody.address === "string" ? reqBody.address.trim() : "";
+  if (!name || !short_description || !address) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      "Please enter required fields: [name, short_description]",
+      "Please enter required fields: [name, short_description, address]",
     );
   }
 
@@ -144,7 +172,7 @@ const createPlace = async (reqBody) => {
     insider_tips: reqBody.insider_tips || null,
     featured_image: reqBody.featured_image || null,
     gallery_images: reqBody.gallery_images || null,
-    address: reqBody.address || null,
+    address,
     phone: reqBody.phone || null,
     email: reqBody.email || null,
     hours: reqBody.hours || null,
@@ -292,6 +320,14 @@ const updatePlace = async (reqBody, id) => {
     "top_pick_rank",
   ];
 
+  if (
+    typeof reqBody.address !== "undefined" &&
+    !(typeof reqBody.address === "string" && reqBody.address.trim())
+  ) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "address can't be empty.");
+  }
+  if (typeof reqBody.address === "string") reqBody.address = reqBody.address.trim();
+
   simpleFields.forEach((field) => {
     if (typeof reqBody[field] !== "undefined") {
       placeDoc[field] = reqBody[field];
@@ -386,16 +422,11 @@ const getAllPlaces = async (filters = {}, userId) => {
   let places = rows.map((row) => row.toJSON());
 
   if (userId) {
-    const savedPlaceIds = await Passport.findAll({
-      where: { user_id: userId, place_id: places.map((p) => p.id) },
-      attributes: ["place_id"],
-      raw: true,
-    });
-    const savedSet = new Set(savedPlaceIds.map((p) => p.place_id));
-    places = places.map((p) => ({
-      ...p,
-      is_in_passport: savedSet.has(p.id),
-    }));
+    const saved = await placeIdsInUserItineraries(
+      userId,
+      places.map((p) => p.id)
+    );
+    places = places.map((p) => ({ ...p, is_in_itinerary: saved.has(p.id) }));
   }
 
   return {
@@ -449,10 +480,8 @@ const findPlaceBySlug = async (slug, expectedType, userId) => {
   result.similar_places = similarPlaces;
 
   if (userId) {
-    const savedEntry = await Passport.findOne({
-      where: { user_id: userId, place_id: placeDoc.id },
-    });
-    result.is_in_passport = !!savedEntry;
+    const saved = await placeIdsInUserItineraries(userId, [placeDoc.id]);
+    result.is_in_itinerary = saved.has(placeDoc.id);
   }
 
   return result;

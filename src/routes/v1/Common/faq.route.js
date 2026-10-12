@@ -4,12 +4,7 @@ const router = express.Router();
 const { faqController } = require("../../../controllers");
 const { adminAuthMiddleware, roleMiddleware } = require("../../../middlewares");
 
-// Was completely unauthenticated on every route, including create/edit/
-// delete — any anonymous visitor could deface the public FAQ content.
-// GET correctly stays public; write operations are now gated. Used
-// isEditor (the broadest content-management tier in the role hierarchy)
-// rather than isAdmin, since this is content management specifically —
-// adjust if a different tier fits.
+// GET is public; writes need the editor tier or above.
 const requireEditor = [
   adminAuthMiddleware.validateJWTtoken,
   roleMiddleware.isEditor,

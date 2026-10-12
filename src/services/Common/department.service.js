@@ -39,11 +39,7 @@ const getAllDeparments = async () => {
   return departmentDoc;
 };
 
-// NOTE: returns [] (truthy!) rather than null when not found, unlike
-// every other findById-style function in this codebase. A caller doing
-// `if (!result)` to check for "not found" would never catch this case.
-// Not changing without seeing where this is actually called from — flag
-// if you'd like this switched to returning null/departmentDoc instead.
+// Returns [] when not found (controller checks for it).
 const findDepartmentById = async (id) => {
   const departmentDoc = await Department.findByPk(id);
   return departmentDoc ? departmentDoc : [];

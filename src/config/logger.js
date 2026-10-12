@@ -15,7 +15,7 @@ const logger = winston.createLogger({
     config.env === "development"
       ? winston.format.colorize()
       : winston.format.uncolorize(),
-    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }), // was missing — no timestamp appeared in log output at all
+    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
     winston.format.splat(),
     winston.format.printf(
       ({ level, message, timestamp }) => `${timestamp} ${level}: ${message}`

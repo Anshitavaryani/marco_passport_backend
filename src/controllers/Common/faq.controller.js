@@ -5,9 +5,6 @@ const responseWrapper = require("../../config/responseWrapper");
 
 const createFaq = catchAsync(async (req, res) => {
   const faq = await faqService.createFaq(req.body);
-  // Was responseWrapper(res, '', ...) — discarding the newly-created
-  // FAQ record (including its id) even though the service already
-  // returns it.
   return responseWrapper(
     res,
     faq,

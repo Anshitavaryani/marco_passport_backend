@@ -41,11 +41,7 @@ ContactUs.init(
   },
   {
     sequelize,
-    // NOTE: 'contactus' (no separator) is inconsistent with every
-    // other table name in this schema (admins, categories, faqs,
-    // user_tokens, etc. all use clean snake_case). Not fixing —
-    // renaming a live table name needs a coordinated migration —
-    // just flagging the inconsistency.
+    // NOTE: not snake_case like the other tables; renaming needs a migration.
     tableName: "contactus",
     timestamps: true,
     underscored: true,
@@ -55,8 +51,6 @@ ContactUs.init(
     deletedAt: "deleted_at",
   }
 );
-
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
 
 ContactUs.beforeDestroy((contactUs) => {
   contactUs.is_active = false;

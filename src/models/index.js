@@ -2,7 +2,6 @@ const Country = require("./country.model");
 const State = require("./state.model");
 const City = require("./city.model");
 const Timezone = require("./timezone.model");
-const Category = require("./category.model");
 
 const Role = require("./role.model");
 const Department = require("./department.model");
@@ -16,9 +15,7 @@ const userLoginTiming = require("./user_login_timings.model");
 
 const ContactUs = require("./contactUs.model");
 const Faq = require("./faq.model");
-const OTP = require("./otp.model");
 
-const Payment = require("./payment.model");
 const BlogCategory = require("./blogCategory.model");
 const Blog = require("./blog.model");
 const Place = require("./place.model");
@@ -27,14 +24,14 @@ const PlaceCategoryMap = require("./placeCategoryMap.model");
 const Review = require("./review.model");
 
 const BusinessSubmission = require("./businessSubmission.model");
-const Passport = require("./passport.model");
+const Itinerary = require("./itinerary.model");
+const ItineraryItem = require("./itineraryItem.model");
 
 module.exports = {
   Country,
   State,
   City,
   Timezone,
-  Category,
 
   Role,
   Department,
@@ -48,9 +45,6 @@ module.exports = {
 
   ContactUs,
   Faq,
-  OTP,
-
-  Payment,
 
   BlogCategory,
   Blog,
@@ -61,7 +55,8 @@ module.exports = {
   Review,
 
   BusinessSubmission,
-  Passport,
+  Itinerary,
+  ItineraryItem,
 };
 
 function initTableRelation() {
@@ -101,25 +96,11 @@ function initTableRelation() {
   User.hasMany(UserToken, { foreignKey: "user_id", as: "user_tokens" });
   UserToken.belongsTo(User, { foreignKey: "user_id", as: "token_user" });
 
-  // FIXED: this used to be a second Role<->Admin pair (identical
-  // foreignKey, identical two models, just different aliases —
-  // 'role_users'/'user_role' — duplicating the Role<->Admin
-  // association declared above for no reason). Those alias names read
-  // like they were written for User, not Admin, and User.role_id had
-  // no association defined anywhere despite the FK existing at the DB
-  // level (see user.model.js). This was almost certainly a copy-paste
-  // slip where Admin should have been User. Fixed to actually create
-  // the missing User<->Role association, reusing the aliases that were
-  // clearly intended for it.
   Role.hasMany(User, { foreignKey: "role_id", as: "role_users" });
   User.belongsTo(Role, { foreignKey: "role_id", as: "user_role" });
 
-  // Not yet wired up as Sequelize associations, though the FK columns
-  // exist at the DB level: OTP<->User, OTP<->Role, UserAttachment<->Role,
-  // userLoginTiming<->Role/Token/Timezone, Payment<->User. None of these
-  // are required unless something needs to eager-load via `include:` —
-  // add them (with appropriate aliases) once a real consumer needs one,
-  // rather than guessing alias names speculatively here.
+  // FK columns without associations (add one when something needs to
+  // eager-load it): UserAttachment<->Role, userLoginTiming<->Role/Token/Timezone.
 
   BlogCategory.hasMany(Blog, {
     foreignKey: "category_id",
@@ -149,11 +130,17 @@ function initTableRelation() {
   User.hasMany(Review, { foreignKey: "user_id", as: "user_reviews" });
   Review.belongsTo(User, { foreignKey: "user_id", as: "reviewer" });
 
-  User.hasMany(Passport, { foreignKey: "user_id", as: "user_passports" });
-  Passport.belongsTo(User, { foreignKey: "user_id", as: "passport_user" });
+  User.hasMany(Itinerary, { foreignKey: "user_id", as: "itineraries" });
+  Itinerary.belongsTo(User, { foreignKey: "user_id", as: "owner" });
 
-  Place.hasMany(Passport, { foreignKey: "place_id", as: "place_passports" });
-  Passport.belongsTo(Place, { foreignKey: "place_id", as: "passport_place" });
+  Itinerary.hasMany(ItineraryItem, { foreignKey: "itinerary_id", as: "items" });
+  ItineraryItem.belongsTo(Itinerary, {
+    foreignKey: "itinerary_id",
+    as: "itinerary",
+  });
+
+  Place.hasMany(ItineraryItem, { foreignKey: "place_id", as: "itinerary_items" });
+  ItineraryItem.belongsTo(Place, { foreignKey: "place_id", as: "place" });
 }
 
 initTableRelation();

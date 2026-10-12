@@ -30,10 +30,10 @@ router.use("/places/:placeId/reviews", reviewRoute);
 // ---------------------------------------------------------------------
 // Admin — generic CRUD for both types
 // ---------------------------------------------------------------------
-router.get("/admin", placeController.getAllPlacesAdmin);
-router.get("/admin/:id", placeController.findPlaceById);
-router.post("/admin", upload, requireAdmin, placeController.createPlace);
-router.put("/admin/:id", upload, requireAdmin, placeController.updatePlace);
+router.get("/admin", requireAdmin, placeController.getAllPlacesAdmin);
+router.get("/admin/:id", requireAdmin, placeController.findPlaceById);
+router.post("/admin", requireAdmin, upload, placeController.createPlace);
+router.put("/admin/:id", requireAdmin, upload, placeController.updatePlace);
 router.delete("/admin/:id", requireAdmin, placeController.deletePlace);
 
 module.exports = router;

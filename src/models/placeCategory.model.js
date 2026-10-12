@@ -9,14 +9,8 @@ PlaceCategory.init(
       autoIncrement: true,
       primaryKey: true,
     },
-    // Matches Place.type — determines which listing pool this category
-    // belongs to: 'business' (/explore's Places to Stay/Eat/Fun
-    // Activities/Shopping/Local Services) or 'place' (/places' Beach/
-    // Wildlife/Culture/Marina tags). Without this, nothing stops a
-    // category meant for one pool being assigned to the wrong type of
-    // listing, and /explore's category filter list would have no clean
-    // way to show only its five categories instead of every category
-    // in the table.
+    // Matches Place.type: 'business' categories for /explore, 'place'
+    // categories for /places.
     type: {
       type: DataTypes.ENUM,
       values: ["business", "place"],
@@ -27,8 +21,7 @@ PlaceCategory.init(
       type: DataTypes.STRING(100),
       allowNull: false,
     },
-    // No longer unique:true — same soft-delete-vs-unique-constraint fix
-    // as blog_categories/places. Real uniqueness lives on slug_active.
+    // Not unique: uniqueness is enforced on slug_active instead.
     slug: {
       type: DataTypes.STRING(150),
       allowNull: false,
@@ -38,8 +31,7 @@ PlaceCategory.init(
       allowNull: true,
       unique: true,
     },
-    // Category card background image (see the "Explore by category"
-    // homepage grid — each card has one).
+    // Card background image for the "Explore by category" grid.
     image: {
       type: DataTypes.STRING(255),
       allowNull: true,

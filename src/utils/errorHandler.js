@@ -29,21 +29,25 @@ const errorHandler = (err, req, res, next) => {
     statusCode = httpStatus.BAD_REQUEST;
     message = err.errors?.[0]?.message || "Invalid data.";
     isOperational = true;
+  } else if (err.name === "MulterError") {
+    // Upload rejected: too large, too many files, or a field other than
+    // "images".
+    statusCode = httpStatus.BAD_REQUEST;
+    message =
+      err.code === "LIMIT_UNEXPECTED_FILE"
+        ? `Unexpected upload field "${err.field}". Upload images in the "images" field.`
+        : err.message;
+    isOperational = true;
   }
 
-  // Log the real error internally regardless of what the client sees.
-  // Previously nothing in this file logged anything — morgan's error
-  // format only logs a one-line summary, never a stack trace, so an
-  // unexpected bug left zero debuggable detail anywhere.
+  // Log the real error regardless of what the client sees.
   if (isOperational) {
     logger.warn(err.message);
   } else {
     logger.error(err);
   }
 
-  // morgan's error log format reads this to include the message on the
-  // same line as the request — it was never set, so those log lines
-  // always ended with an empty "message: ".
+  // Read by morgan's error log format.
   res.locals.errorMessage = err.message;
 
   res.status(statusCode).json({

@@ -3,38 +3,35 @@ const router = express.Router();
 
 const { userAuthController } = require("../../../controllers");
 const { userAuthMiddleware } = require("../../../middlewares");
+const { emailLimiter } = require("../../../middlewares/rateLimiter");
 
 router.use(userAuthMiddleware.setRoleIdIfNotPresent);
 
-// OTP-based email verification is disabled for now — this site uses
-// frontend captcha for bot prevention at signup instead. Not deleted,
-// just unmounted; uncomment these two lines plus the corresponding
-// block in auth.service.js's register() to restore it.
-// router.post("/otp", userAuthController.sendOTP);
-// router.post("/verify-otp", userAuthController.verifyOTP);
-
 router.post(
   "/register",
-  [userAuthMiddleware.validateRegisterUserBody],
+  [emailLimiter, userAuthMiddleware.validateRegisterUserBody],
   userAuthController.register,
+);
+router.post("/verify-email", userAuthController.verifyEmail);
+router.post(
+  "/resend-verification",
+  emailLimiter,
+  userAuthController.resendVerification,
 );
 router.post(
   "/login",
   [userAuthMiddleware.validateSignInReqBody],
   userAuthController.login,
 );
+router.post("/forgot-password", emailLimiter, userAuthController.forgotPassword);
+router.post("/reset-password", userAuthController.resetPassword);
 router.post(
-  "/reset-password",
+  "/change-password",
   [
     userAuthMiddleware.validateResetPassordBody,
     userAuthMiddleware.verifyAuthJWTToken,
   ],
-  userAuthController.resetPassword,
-);
-router.post(
-  "/forgot-password",
-  [userAuthMiddleware.validateForgetPassordToken],
-  userAuthController.forgotPassword,
+  userAuthController.changePassword,
 );
 router.get(
   "/logout",

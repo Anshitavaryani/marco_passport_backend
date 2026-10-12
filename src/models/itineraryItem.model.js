@@ -1,21 +1,23 @@
 const { Sequelize, DataTypes, Model } = require("sequelize");
 const sequelize = require("../config/central.db");
 
-class Passport extends Model {}
-Passport.init(
+// One stop in an itinerary. `position` is the visiting order (0-based),
+// which is also the order the map draws the route in.
+class ItineraryItem extends Model {}
+ItineraryItem.init(
   {
     id: {
       type: DataTypes.BIGINT.UNSIGNED,
       autoIncrement: true,
       primaryKey: true,
     },
-    user_id: {
+    itinerary_id: {
       type: DataTypes.BIGINT.UNSIGNED,
       allowNull: false,
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
       references: {
-        model: "users",
+        model: "itineraries",
         key: "id",
       },
     },
@@ -28,6 +30,11 @@ Passport.init(
         model: "places",
         key: "id",
       },
+    },
+    position: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
     },
     visit_date: {
       type: DataTypes.DATEONLY,
@@ -45,7 +52,7 @@ Passport.init(
   },
   {
     sequelize,
-    tableName: "passports",
+    tableName: "itinerary_items",
     timestamps: true,
     underscored: true,
     createdAt: "created_at",
@@ -53,11 +60,12 @@ Passport.init(
     indexes: [
       {
         unique: true,
-        fields: ["user_id", "place_id"],
-        name: "passports_user_place_unique",
+        fields: ["itinerary_id", "place_id"],
+        name: "itinerary_items_itinerary_place_unique",
       },
+      { fields: ["place_id"], name: "itinerary_items_place_id" },
     ],
   }
 );
 
-module.exports = Passport;
+module.exports = ItineraryItem;

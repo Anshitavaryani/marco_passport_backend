@@ -83,8 +83,6 @@ City.init(
   }
 );
 
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
-
 City.beforeDestroy(async (city) => {
   city.is_active = false;
 });

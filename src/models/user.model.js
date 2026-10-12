@@ -32,10 +32,6 @@ User.init(
       type: DataTypes.STRING,
       allowNull: true,
     },
-    stripe_customer_id: {
-      type: DataTypes.STRING(200),
-      allowNull: true,
-    },
     socket_id: {
       type: DataTypes.STRING(150),
       allowNull: true,
@@ -44,10 +40,6 @@ User.init(
       type: DataTypes.STRING,
       allowNull: true,
     },
-    // NOTE: column name typo ("reffral_id" -> "referral_id"). Not
-    // renaming — this is a persisted column name, needs a coordinated
-    // migration (RENAME COLUMN + update this attribute name together),
-    // not a silent JS-side edit. Flagging so it's a deliberate fix later.
     reffral_id: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -104,6 +96,13 @@ User.init(
       type: DataTypes.DATE,
       allowNull: true,
     },
+    // "email:role_id" while the row is live, NULL once soft-deleted. The
+    // unique index on it stops two live accounts sharing an email+role,
+    // even under concurrent sign-ups (MySQL allows many NULLs).
+    email_role_active_key: {
+      type: DataTypes.STRING(210),
+      allowNull: true,
+    },
   },
   {
     sequelize,
@@ -114,32 +113,29 @@ User.init(
     createdAt: "created_at",
     updatedAt: "updated_at",
     deletedAt: "deleted_at",
+    indexes: [
+      {
+        unique: true,
+        fields: ["email_role_active_key"],
+        name: "users_email_role_active_unique",
+      },
+    ],
   }
 );
 
-User.afterCreate(async (user) => {
-  const socketId = `${user.role_id}-${user.id}-socketId`;
-  user.socket_id = socketId;
-  user.user_name = await generateUniqueUserName(user.email, user.role_id);
-  await user.save();
+User.beforeCreate(async (user) => {
+  if (!user.user_name) {
+    user.user_name = await generateUniqueUserName(user.email, user.role_id);
+  }
 });
 
-// Math.random() here is fine as-is — this is a display username, not a
-// security token, so there's no reason to reach for crypto.randomInt
-// the way randomStringGenerate.js needed to for password-reset tokens.
+// Display username suffix, not a security token — Math.random() is fine.
 function generateRandomNumber() {
   return Math.floor(10000 + Math.random() * 90000);
 }
 
-// Was: transformEmail(email) — picked email-local-part + a random
-// 5-digit suffix with NO collision check at all, despite
-// User.isUserNameTaken() existing specifically to check this. With ~90k
-// possible suffixes, two users sharing a common local-part (e.g. both
-// named "john") collide with non-trivial odds once you have more than a
-// handful of them — and a collision either throws unhandled (if
-// user_name has a unique index) or silently creates a duplicate
-// username (if it doesn't). Added a retry loop with a guaranteed-unique
-// fallback.
+// email local-part + random suffix, retried on collision, with a
+// timestamp fallback that is always unique.
 async function generateUniqueUserName(email, roleId) {
   const base = email.split("@")[0];
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -151,13 +147,6 @@ async function generateUniqueUserName(email, roleId) {
   return `${base}${Date.now()}`;
 }
 
-User.isEmailTaken = async function (email, role_id) {
-  let u = await this.findOne({
-    where: { email: email, role_id: role_id, is_active: true },
-  });
-  return !!u;
-};
-
 User.isUserNameTaken = async function (user_name, role_id) {
   let u_n = await this.findOne({
     where: { user_name: user_name, role_id: role_id, is_active: true },
@@ -165,10 +154,10 @@ User.isUserNameTaken = async function (user_name, role_id) {
   return !!u_n;
 };
 
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
-
 User.beforeDestroy(async (user) => {
+  // Soft delete saves with hooks off, so beforeSave won't clear the key.
   user.is_active = false;
+  user.email_role_active_key = null;
 });
 
 User.beforeSave(async (user) => {

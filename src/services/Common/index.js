@@ -13,7 +13,6 @@ const placeCategoryService = require('./placeCategory.service');
 const placeService = require('./place.service');
 const reviewService = require('./review.service');
 const businessSubmissionService = require('./businessSubmission.service');
-const passportService = require('./passport.service')
 
 module.exports = {
     roleService,
@@ -30,6 +29,5 @@ module.exports = {
     placeCategoryService,
     placeService,
     reviewService,
-    businessSubmissionService,
-    passportService
+    businessSubmissionService
 };

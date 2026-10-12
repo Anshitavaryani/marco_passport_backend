@@ -50,11 +50,7 @@ const updateCategory = async (reqBody, id) => {
     categoryDoc["name"] = reqBody.name;
   }
 
-  // If a slug was explicitly provided, use that (existing behavior).
-  // Otherwise, if the name just changed, auto-regenerate the slug from
-  // the new name — matches createCategory's own auto-derive behavior,
-  // so an update doesn't silently leave a stale slug that no longer
-  // matches the category's actual name.
+  // An explicit slug wins; otherwise a name change regenerates the slug.
   const explicitSlug =
     reqBody.slug && typeof reqBody.slug !== "undefined" && reqBody.slug !== "";
 
@@ -83,11 +79,7 @@ const getAllCategories = async () => {
   return categoryDocs;
 };
 
-// Matches department.service.js's findDepartmentById convention
-// (returns [] rather than null when not found) for consistency across
-// this codebase — same caveat applies: a caller checking `if (!result)`
-// alone won't catch the not-found case, so the controller layer
-// explicitly checks for an empty array too (see blogCategory.controller.js).
+// Returns [] when not found (controller checks for it).
 const findCategoryById = async (id) => {
   const categoryDoc = await BlogCategory.findByPk(id);
   return categoryDoc ? categoryDoc : [];

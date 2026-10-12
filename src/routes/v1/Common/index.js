@@ -5,13 +5,11 @@ const departmentRoute = require("./department.route");
 const countryRoute = require("./country.route");
 const stateRoute = require("./state.route");
 const cityRoute = require("./city.route");
-const paymentRoute = require("./payment.route");
 const blogRoute = require("./blog.route");
 const blogCategoryRoute = require("./blogCategory.route");
 const placeCategoryRoute = require("./placeCategory.route");
 const exploreRoute = require("./explore.route");
 const businessSubmissionRoute = require("./businessSubmission.route");
-const passportRoute = require('./passport.route')
 
 const commonRoutes = [
   {
@@ -43,10 +41,6 @@ const commonRoutes = [
     route: cityRoute,
   },
   {
-    path: "/payment",
-    route: paymentRoute,
-  },
-  {
     path: "/blog",
     route: blogRoute,
   },
@@ -65,10 +59,6 @@ const commonRoutes = [
   {
     path: "/business-submission",
     route: businessSubmissionRoute,
-  },
-  {
-    path: "/user/passport/",
-    route: passportRoute,
   },
 ];
 

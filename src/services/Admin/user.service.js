@@ -2,7 +2,14 @@
 
 const httpStatus = require("http-status");
 const { Op } = require("sequelize");
-const { User, Profile, Review, Passport, Place } = require("../../models");
+const {
+  User,
+  Profile,
+  Review,
+  Itinerary,
+  ItineraryItem,
+  Place,
+} = require("../../models");
 const ApiError = require("../../utils/ApiError");
 const sequelize = require("../../config/central.db");
 
@@ -34,9 +41,9 @@ const getAllUsers = async (query) => {
         ],
         [
           sequelize.literal(`(
-            SELECT COUNT(*) FROM \`passports\` p WHERE p.user_id = \`User\`.\`id\`
+            SELECT COUNT(*) FROM \`itineraries\` i WHERE i.user_id = \`User\`.\`id\`
           )`),
-          "passports_count",
+          "itineraries_count",
         ],
       ],
       include: [
@@ -51,7 +58,7 @@ const getAllUsers = async (query) => {
           where,
           sequelize.literal(`(
             EXISTS (SELECT 1 FROM \`reviews\` r WHERE r.user_id = \`User\`.\`id\`)
-            OR EXISTS (SELECT 1 FROM \`passports\` p WHERE p.user_id = \`User\`.\`id\`)
+            OR EXISTS (SELECT 1 FROM \`itineraries\` i WHERE i.user_id = \`User\`.\`id\`)
           )`),
         ],
       },
@@ -89,21 +96,28 @@ const getUserById = async (id) => {
           {
             model: Place,
             as: "review_place",
-            attributes: ["id", "name", "type"], // added type
+            attributes: ["id", "name", "type"],
             paranoid: false, // show even if the place was soft-deleted
           },
         ],
       },
       {
-        model: Passport,
-        as: "user_passports",
-        attributes: ["id", "place_id", "created_at"],
+        model: Itinerary,
+        as: "itineraries",
+        attributes: ["id", "name", "start_date", "end_date", "created_at"],
         include: [
           {
-            model: Place,
-            as: "passport_place",
-            attributes: ["id", "name", "type"], // added type
-            paranoid: false, // show even if the place was soft-deleted
+            model: ItineraryItem,
+            as: "items",
+            attributes: ["id", "place_id", "position", "visit_date"],
+            include: [
+              {
+                model: Place,
+                as: "place",
+                attributes: ["id", "name", "type"],
+                paranoid: false, // show even if the place was soft-deleted
+              },
+            ],
           },
         ],
       },
@@ -137,7 +151,8 @@ const deleteUsers = async (body) => {
     }
 
     await User.update(
-      { is_active: false, deleted_at: new Date() },
+      // Bulk update skips model hooks, so clear the email key here too.
+      { is_active: false, deleted_at: new Date(), email_role_active_key: null },
       { where: { id: userIds }, transaction: t }
     );
 

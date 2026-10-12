@@ -1,22 +1,22 @@
-const config = require("../../src/config/config");
+const config = require("../../config/config");
 
-// Rewritten to match the same bulletproof table-based layout used in
-// sendEmailVerificationFormat.js. The previous version used CSS flexbox
-// on <body>/.container for centering — flexbox has no support at all in
-// Outlook desktop (it renders HTML email with Word's engine, not a real
-// browser engine), so this would have rendered unstyled/broken there.
-// Given this app's target market (US/Canada small businesses, where
-// Outlook/Microsoft 365 is common), that's a real rendering bug, not
-// just a style preference — so this reuses the same table-based
-// structure that already works correctly in the sibling template rather
-// than inventing a new layout.
-const forgotPasswordSendOTPFormat = (otp) => {
+const escapeHtml = (value) =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+// Generic "click the button" email (verify email, reset password).
+// Table-based layout (no flexbox) so it renders in Outlook desktop.
+const actionLinkFormat = ({ title, intro, buttonText, url, footnote }) => {
+  const safeUrl = escapeHtml(url);
   return `<!DOCTYPE html>
     <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-        <title>Forgot Password</title>
+        <title>${escapeHtml(title)}</title>
         <style media="all" type="text/css">
           @media only screen and (max-width: 640px) {
             .main p,
@@ -141,7 +141,7 @@ const forgotPasswordSendOTPFormat = (otp) => {
                     visibility: hidden;
                     width: 0;
                   "
-                  >Password Reset Code</span
+                  >${escapeHtml(title)}</span
                 >
                 <table
                   role="presentation"
@@ -192,8 +192,7 @@ const forgotPasswordSendOTPFormat = (otp) => {
                           margin-bottom: 16px;
                         "
                       >
-                        A password reset was requested for your ${config.app_name} account.
-                        Use the code below to continue. This code is valid for 5 minutes.
+                        ${intro}
                       </p>
                       <table
                         role="presentation"
@@ -250,23 +249,24 @@ const forgotPasswordSendOTPFormat = (otp) => {
                                       align="center"
                                       bgcolor="#0867ec"
                                     >
-                                      <span
+                                      <a
+                                        href="${safeUrl}"
+                                        target="_blank"
                                         style="
                                           border: solid 2px #0867ec;
                                           border-radius: 4px;
                                           box-sizing: border-box;
                                           display: inline-block;
-                                          font-size: 20px;
+                                          font-size: 16px;
                                           font-weight: bold;
-                                          letter-spacing: 4px;
                                           margin: 0;
                                           padding: 12px 24px;
-                                          text-transform: uppercase;
+                                          text-decoration: none;
                                           background-color: #0867ec;
                                           border-color: #0867ec;
                                           color: #ffffff;
                                         "
-                                        >${otp}</span
+                                        >${escapeHtml(buttonText)}</a
                                       >
                                     </td>
                                   </tr>
@@ -285,8 +285,11 @@ const forgotPasswordSendOTPFormat = (otp) => {
                           margin-bottom: 16px;
                         "
                       >
-                        If you did not request a password reset, please ignore this email —
-                        your password will not be changed.
+                        If the button doesn't work, copy this link into your browser:
+                        <br />
+                        <a href="${safeUrl}" style="color: #0867ec; word-break: break-all;">${safeUrl}</a>
+                        <br /><br />
+                        ${footnote}
                       </p>
                       <p
                         style="
@@ -363,4 +366,4 @@ const forgotPasswordSendOTPFormat = (otp) => {
     `;
 };
 
-module.exports = forgotPasswordSendOTPFormat;
+module.exports = actionLinkFormat;

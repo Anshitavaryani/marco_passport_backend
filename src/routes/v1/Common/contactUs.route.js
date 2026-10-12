@@ -4,12 +4,7 @@ const router = express.Router();
 const { contactUsController } = require("../../../controllers");
 const { adminAuthMiddleware, roleMiddleware } = require("../../../middlewares");
 
-// Was completely unauthenticated on every route, including listing every
-// submission ever made (real PII — names, emails, phone numbers,
-// addresses) and deleting/editing any of them by id. POST (the actual
-// public contact form) correctly stays open; everything else is now
-// admin-gated. Adjust the role tier (currently isAdmin) if a different
-// one fits your intended access level.
+// POST (the public contact form) is open; everything else is admin-only.
 router.post("/", contactUsController.createContactUs);
 router.put(
   "/:id",

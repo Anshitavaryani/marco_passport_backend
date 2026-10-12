@@ -47,8 +47,6 @@ Role.init(
   }
 );
 
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
-
 Role.beforeDestroy(async (role) => {
   role.is_active = false;
 });

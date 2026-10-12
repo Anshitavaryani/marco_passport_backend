@@ -13,7 +13,6 @@ const getProfile = async (body, headers) => {
       "user_name",
       "email",
       "role_id",
-      "stripe_customer_id",
       "socket_id",
       "fcm_token",
       "status",

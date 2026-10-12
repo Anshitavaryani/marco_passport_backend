@@ -84,10 +84,6 @@ UserToken.init(
   }
 );
 
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
-// It also shadowed the outer `UserToken` class with its own parameter
-// (`(UserToken) => {...}`), fixed below by lowercasing.
-
 UserToken.beforeDestroy(async (userToken) => {
   userToken.is_active = false;
 });

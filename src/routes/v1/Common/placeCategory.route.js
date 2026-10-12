@@ -12,8 +12,8 @@ const requireAdmin = [
 
 router.get("/", placeCategoryController.getAllCategories);
 router.get("/:id", placeCategoryController.findCategoryById);
-router.post("/", upload, requireAdmin, placeCategoryController.createCategory);
-router.put("/:id", upload, requireAdmin, placeCategoryController.updateCategory);
+router.post("/", requireAdmin, upload, placeCategoryController.createCategory);
+router.put("/:id", requireAdmin, upload, placeCategoryController.updateCategory);
 router.delete("/:id", requireAdmin, placeCategoryController.deleteCategory);
 
 module.exports = router;

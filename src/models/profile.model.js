@@ -77,8 +77,6 @@ Profile.init(
   }
 );
 
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
-
 Profile.beforeDestroy(async (profile) => {
   profile.is_active = false;
 });

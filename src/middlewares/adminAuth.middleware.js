@@ -10,7 +10,7 @@ const config = require("../config/config");
 const { validateResetPassordBody } = require("./common.middleware");
 
 const validateCreateAdminBody = catchAsync(async (req, res, next) => {
-  const { name, email, password, role_id, department_id } = req.body;
+  const { name, email, role_id, department_id } = req.body;
   if (!name || !email || !role_id || !department_id) {
     return responseWrapper(
       res,
@@ -20,7 +20,8 @@ const validateCreateAdminBody = catchAsync(async (req, res, next) => {
     );
   }
 
-  if (role_id === config.SUP_ADM_ROLE_ID) {
+  // role_id may arrive as a number; config values are strings.
+  if (String(role_id) === String(config.SUP_ADM_ROLE_ID)) {
     return responseWrapper(
       res,
       "",
@@ -120,14 +121,7 @@ const validateJWTtoken = catchAsync(async (req, res, next) => {
     );
   }
 
-  // req.body is only ever populated by a prior body-parsing middleware
-  // (express.json(), multer, etc.) that actually matched the request's
-  // Content-Type. A GET request typically sends no body at all, so
-  // nothing runs and req.body stays undefined — writing `.user` onto
-  // that threw "Cannot set properties of undefined" the moment any GET
-  // route was placed behind this middleware (e.g. GET /explore/admin).
-  // This guard makes sure there's always an object here to write onto,
-  // regardless of the request method or whether a body was sent.
+  // GET requests have no parsed body, so make sure there's one to write to.
   if (!req.body) {
     req.body = {};
   }

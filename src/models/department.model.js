@@ -1,8 +1,3 @@
-// NOTE: filename ("departmenat") and this file's require sites elsewhere
-// (models/index.js does `require('./departmenat.model')`) both carry the
-// same typo. Not renaming the file in this pass — that requires updating
-// every require() site in one coordinated change, not just this file.
-// Flagging so it's a deliberate fix later, not forgotten.
 const { Sequelize, DataTypes, Model } = require("sequelize");
 const sequelize = require("../config/central.db");
 
@@ -47,8 +42,6 @@ Department.init(
     deletedAt: "deleted_at",
   }
 );
-
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
 
 Department.beforeDestroy(async (department) => {
   department.is_active = false;

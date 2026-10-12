@@ -189,11 +189,7 @@ const deleteCategory = async (id) => {
     );
   }
 
-  categoryDoc.is_active = false;
-  categoryDoc.slug_active = null;
-
-  await categoryDoc.save();
-
+  // beforeDestroy clears is_active/slug_active.
   await categoryDoc.destroy();
 
   return true;

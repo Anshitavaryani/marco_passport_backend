@@ -1,67 +1,46 @@
-const config = require("../../src/config/config");
+const config = require("../../config/config");
 
-
-const emailVerificationFormat = (otp) => {
+// Table-based layout (no flexbox) so it renders in Outlook desktop.
+const forgotPasswordSendOTPFormat = (otp) => {
   return `<!DOCTYPE html>
     <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-        <title>Simple Transactional Email</title>
+        <title>Forgot Password</title>
         <style media="all" type="text/css">
-          @media all {
-            .btn-primary table td:hover {
-              background-color: #ec0867 !important;
-            }
-    
-            .btn-primary a:hover {
-              background-color: #ec0867 !important;
-              border-color: #ec0867 !important;
-            }
-          }
           @media only screen and (max-width: 640px) {
             .main p,
             .main td,
             .main span {
               font-size: 16px !important;
             }
-    
+
             .wrapper {
               padding: 8px !important;
             }
-    
+
             .content {
               padding: 0 !important;
             }
-    
+
             .container {
               padding: 0 !important;
               padding-top: 8px !important;
               width: 100% !important;
             }
-    
+
             .main {
               border-left-width: 0 !important;
               border-radius: 0 !important;
               border-right-width: 0 !important;
-            }
-    
-            .btn table {
-              max-width: 100% !important;
-              width: 100% !important;
-            }
-    
-            .btn a {
-              font-size: 16px !important;
-              max-width: 100% !important;
-              width: 100% !important;
             }
           }
           @media all {
             .ExternalClass {
               width: 100%;
             }
-    
+
             .ExternalClass,
             .ExternalClass p,
             .ExternalClass span,
@@ -69,24 +48,6 @@ const emailVerificationFormat = (otp) => {
             .ExternalClass td,
             .ExternalClass div {
               line-height: 100%;
-            }
-    
-            .apple-link a {
-              color: inherit !important;
-              font-family: inherit !important;
-              font-size: inherit !important;
-              font-weight: inherit !important;
-              line-height: inherit !important;
-              text-decoration: none !important;
-            }
-    
-            #MessageViewBody a {
-              color: inherit;
-              text-decoration: none;
-              font-size: inherit;
-              font-family: inherit;
-              font-weight: inherit;
-              line-height: inherit;
             }
           }
         </style>
@@ -157,7 +118,6 @@ const emailVerificationFormat = (otp) => {
                   padding: 0;
                 "
               >
-                <!-- START CENTERED WHITE CONTAINER -->
                 <span
                   class="preheader"
                   style="
@@ -172,7 +132,7 @@ const emailVerificationFormat = (otp) => {
                     visibility: hidden;
                     width: 0;
                   "
-                  >OTP Verification Page</span
+                  >Password Reset Code</span
                 >
                 <table
                   role="presentation"
@@ -191,7 +151,6 @@ const emailVerificationFormat = (otp) => {
                   "
                   width="100%"
                 >
-                  <!-- START MAIN CONTENT AREA -->
                   <tr>
                     <td
                       class="wrapper"
@@ -224,9 +183,8 @@ const emailVerificationFormat = (otp) => {
                           margin-bottom: 16px;
                         "
                       >
-                        Thank you for choosing ${config.app_name}. Use the following
-                        OTP to complete your Sign Up procedures. OTP is valid for 5
-                        minutes
+                        A password reset was requested for your ${config.app_name} account.
+                        Use the code below to continue. This code is valid for 5 minutes.
                       </p>
                       <table
                         role="presentation"
@@ -283,24 +241,24 @@ const emailVerificationFormat = (otp) => {
                                       align="center"
                                       bgcolor="#0867ec"
                                     >
-                                    <span
-                                      style="
-                                        border: solid 2px #0867ec;
-                                        border-radius: 4px;
-                                        box-sizing: border-box;
-                                        display: inline-block;
-                                        font-size: 20px;
-                                        font-weight: bold;
-                                        letter-spacing: 4px;
-                                        margin: 0;
-                                        padding: 12px 24px;
-                                        text-transform: uppercase;
-                                        background-color: #0867ec;
-                                        border-color: #0867ec;
-                                        color: #ffffff;
-                                      "
-                                      >${otp}</span
-                                    >
+                                      <span
+                                        style="
+                                          border: solid 2px #0867ec;
+                                          border-radius: 4px;
+                                          box-sizing: border-box;
+                                          display: inline-block;
+                                          font-size: 20px;
+                                          font-weight: bold;
+                                          letter-spacing: 4px;
+                                          margin: 0;
+                                          padding: 12px 24px;
+                                          text-transform: uppercase;
+                                          background-color: #0867ec;
+                                          border-color: #0867ec;
+                                          color: #ffffff;
+                                        "
+                                        >${otp}</span
+                                      >
                                     </td>
                                   </tr>
                                 </tbody>
@@ -318,8 +276,8 @@ const emailVerificationFormat = (otp) => {
                           margin-bottom: 16px;
                         "
                       >
-                        If you did not request any Email Verification request,
-                        please ignore this email.
+                        If you did not request a password reset, please ignore this email —
+                        your password will not be changed.
                       </p>
                       <p
                         style="
@@ -336,10 +294,7 @@ const emailVerificationFormat = (otp) => {
                       </p>
                     </td>
                   </tr>
-    
-                  <!-- END MAIN CONTENT AREA -->
                 </table>
-    
                 <div
                   class="footer"
                   style="
@@ -380,8 +335,6 @@ const emailVerificationFormat = (otp) => {
                     </tr>
                   </table>
                 </div>
-
-                <!-- END CENTERED WHITE CONTAINER -->
               </div>
             </td>
             <td
@@ -401,4 +354,4 @@ const emailVerificationFormat = (otp) => {
     `;
 };
 
-module.exports = emailVerificationFormat;
+module.exports = forgotPasswordSendOTPFormat;

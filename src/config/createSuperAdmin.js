@@ -7,7 +7,6 @@ async function createSuperAdmin() {
   const {
     SUPER_ADMIN_NAME,
     SUPER_ADMIN_EMAIL,
-    SUPER_ADMIN_PASSWORD,
     SUP_ADM_ROLE_ID,
     ADM_DEPT_ID,
   } = config;
@@ -15,12 +14,11 @@ async function createSuperAdmin() {
   if (
     !SUPER_ADMIN_NAME ||
     !SUPER_ADMIN_EMAIL ||
-    !SUPER_ADMIN_PASSWORD ||
     !SUP_ADM_ROLE_ID ||
     !ADM_DEPT_ID
   ) {
     logger.error(
-      "Cannot create super admin — missing one of SUPER_ADMIN_NAME, SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD, SUP_ADM_ROLE_ID, ADM_DEPT_ID in .env"
+      "Cannot create super admin — missing one of SUPER_ADMIN_NAME, SUPER_ADMIN_EMAIL, SUP_ADM_ROLE_ID, ADM_DEPT_ID in .env"
     );
     await sequelize.close();
     process.exit(1);
@@ -29,19 +27,15 @@ async function createSuperAdmin() {
   const adminObj = {
     name: SUPER_ADMIN_NAME,
     email: SUPER_ADMIN_EMAIL,
-    password: SUPER_ADMIN_PASSWORD,
     role_id: SUP_ADM_ROLE_ID,
     department_id: ADM_DEPT_ID,
   };
 
   try {
     await adminAuthService.createAdminUser(adminObj);
-    // Deliberately not logging the password here — it already lives in
-    // your .env, and printing it to stdout means it ends up in
-    // terminal scrollback, shell history, and any log aggregator
-    // watching this process's output.
+    // createAdminUser generates a temporary password and emails it.
     logger.info(
-      `Super admin created. Email: ${SUPER_ADMIN_EMAIL} (password is the one set in SUPER_ADMIN_PASSWORD in .env)`
+      `Super admin created. Temporary password emailed to ${SUPER_ADMIN_EMAIL}.`
     );
     await sequelize.close();
     process.exit(0);

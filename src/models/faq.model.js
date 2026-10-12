@@ -59,10 +59,6 @@ Faq.init(
   }
 );
 
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
-// It also shadowed the outer `Faq` class with its own parameter name
-// (`(Faq) => {...}`), which is fixed below by lowercasing.
-
 Faq.beforeDestroy((faq) => {
   faq.is_active = false;
 });

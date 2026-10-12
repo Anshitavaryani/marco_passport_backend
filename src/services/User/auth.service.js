@@ -2,38 +2,30 @@ const httpStatus = require("http-status");
 const bcrypt = require("bcrypt");
 const { toZonedTime, format: formatTz } = require("date-fns-tz");
 
-const {
-  OTP,
-  User,
-  UserAttachment,
-  Profile,
-  userLoginTiming,
-  Timezone,
-} = require("../../models");
-const validateEmail = require("../../helpers/validateEmail");
+const { User, Profile, userLoginTiming, Timezone } = require("../../models");
+const sequelize = require("../../config/central.db");
+const config = require("../../config/config");
 const ApiError = require("../../utils/ApiError");
 const logger = require("../../config/logger");
-const {
-  sendForgotPasswordOTP,
-  sendEmailVerification,
-} = require("../Common/email.service");
-const { generateAuthTokens } = require("../Common/token.service");
-const { otpTypes, userStatusTypes } = require("../../config/types");
-const generateOTP = require("../../utils/generateOTP");
-const generateRandomString = require("../../utils/randomStringGenrate");
+const validatePassword = require("../../helpers/validatePassword");
+const tokenService = require("../Common/token.service");
+const emailService = require("../Common/email.service");
+const { userStatusTypes, tokenTypes } = require("../../config/types");
 
-const UPLOAD_FIELD_TYPES = {
-  images: "Image",
-  gifs: "Gif",
-  videos: "Video",
-  docs: "Document",
-  songs: "Audio",
-};
+const HOUR_MS = 60 * 60 * 1000;
+// Unverified accounts are deleted this long after sign-up
+// (src/jobs/cleanupUnverifiedUsers.js); the verify link expires with them.
+const UNVERIFIED_ACCOUNT_TTL_MS = 24 * HOUR_MS;
+const PASSWORD_RESET_TTL_MS = HOUR_MS;
+// Minimum gap between "send me another email" requests per user.
+const EMAIL_RESEND_THROTTLE_MS = 60 * 1000;
+
+const PASSWORD_RULES_MESSAGE =
+  "Password should have a minimum length of 8 characters and must have at least 2 digits and No Blank Space";
 
 const isValidTimezone = (tz) => {
   if (!tz) return false;
   try {
-    // eslint-disable-next-line no-new
     new Intl.DateTimeFormat(undefined, { timeZone: tz });
     return true;
   } catch {
@@ -41,176 +33,130 @@ const isValidTimezone = (tz) => {
   }
 };
 
-// sendOTP / verifyOTP are kept fully intact and exported below, even
-// though nothing currently calls them for signup verification — OTP
-// email verification is disabled site-wide for now. forgot-password
-// still uses this same sendOTP/verifyOTP pair (see the type-based
-// branching inside verifyOTP), which is why the user-existence check
-// below matters even with signup verification off.
-const sendOTP = async (body, headers) => {
-  const { email, type } = body;
-  const { role_id } = headers;
+const hashPassword = (password) => bcrypt.hashSync(password, bcrypt.genSaltSync(10));
 
-  if (!validateEmail(email) || !Object.values(otpTypes).includes(type)) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid Email or Type.");
+const verifyEmailUrl = (token) => `${config.frontendUrl}/verify-email?token=${token}`;
+const resetPasswordUrl = (token) => `${config.frontendUrl}/reset-password?token=${token}`;
+
+// Session payload shared by login and verify-email (which logs the user in).
+const startSession = async (user, { ip_address, timezone } = {}) => {
+  const token = await tokenService.generateAuthTokens(user);
+  try {
+    await saveLoginTiming(user, token, { ip_address }, timezone);
+  } catch (error) {
+    logger.warn(`saveLoginTiming failed for user ${user.id}: ${error.message}`);
   }
+  delete token.access.id;
+  delete token.refresh.id;
 
-  // Was missing — an OTP would previously get generated and emailed
-  // for any syntactically valid email regardless of whether an
-  // account with that email existed, and the OTP row never recorded
-  // which user it belonged to (user_id was omitted below). Restored.
-  const userDoc = await User.findOne({
-    where: { email: email, role_id: role_id },
+  const profile = await Profile.findOne({
+    where: { user_id: user.id },
+    attributes: ["name"],
   });
-  if (!userDoc) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "User Not Found");
-  }
-
-  const existingOtp = await OTP.findOne({
-    where: { email: body?.email, type: body?.type, role_id: role_id },
-  });
-  if (existingOtp) await existingOtp.destroy({ force: true });
-
-  const generatedOTP = generateOTP(4);
-  const otpObj = {
-    email: email,
-    code: generatedOTP,
-    type: type,
-    role_id: role_id,
-    user_id: userDoc.id,
+  return {
+    id: user.id,
+    name: profile ? profile.name : null,
+    email: user.email,
+    tokens: token,
+    role_id: user.role_id,
   };
-  const otpDoc = await OTP.create(otpObj);
-  if (!otpDoc) {
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      "Failed to generate new OTP."
-    );
-  }
-  if (type === otpTypes.FORGOT_PASSWORD) {
-    await sendForgotPasswordOTP(email, generatedOTP);
-  } else if (type === otpTypes.EMAIL_VERIFICATION) {
-    await sendEmailVerification(email, generatedOTP);
-  }
-  return true;
 };
 
-const verifyOTP = async (email, otp, type, role_id) => {
-  if (!email || !otp || !type || !role_id) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Please Enter Required Fields : [email, otp, type, role_id]"
-    );
-  }
+// Creates the account as PENDING and emails a verify link. If the email
+// can't be sent, nothing is saved, so the user can simply try again.
+const register = async (body, headers) => {
+  const { name, email, password } = body;
+  const { role_id } = headers;
 
-  const otpDoc = await OTP.findOne({
-    where: {
-      email: email,
-      type: type,
-      is_active: true,
-      is_verified: false,
-      role_id: role_id,
-    },
+  await sequelize.transaction(async (transaction) => {
+    const user = await User.create(
+      {
+        email,
+        password: hashPassword(password),
+        role_id,
+        status: userStatusTypes.PENDING,
+      },
+      { transaction }
+    );
+    await Profile.create({ email, name, user_id: user.id }, { transaction });
+
+    const rawToken = await tokenService.createOneTimeToken(
+      user,
+      tokenTypes.VERIFY_EMAIL,
+      UNVERIFIED_ACCOUNT_TTL_MS,
+      transaction
+    );
+    try {
+      await emailService.sendVerificationEmail(email, verifyEmailUrl(rawToken));
+    } catch (error) {
+      logger.error(`Verification email to user ${user.id} failed: ${error.message}`);
+      throw new ApiError(
+        httpStatus.SERVICE_UNAVAILABLE,
+        "We couldn't send the verification email. Please try again in a few minutes."
+      );
+    }
   });
-  if (!otpDoc) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid Email or Type");
-  }
 
-  if (otp !== otpDoc.code) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid OTP Entered");
-  }
-
-  if (otpDoc.otp_expiration_time < new Date()) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "OTP has been Expired");
-  }
-
-  otpDoc.is_active = false;
-  otpDoc.is_verified = true;
-  let isUpdate = false;
-  let token = "";
-  if (type !== otpTypes.FORGOT_PASSWORD) {
-    const [affectedCount] = await User.update(
-      { status: "ACCEPTED" },
-      { where: { email: email, role_id: role_id, is_active: true } }
-    );
-    isUpdate = affectedCount > 0;
-  } else {
-    token = generateRandomString(50);
-    otpDoc.code = token;
-  }
-  await otpDoc.save();
-  return token ? { token } : isUpdate;
+  return { email };
 };
 
-const register = async (body, files, headers) => {
-  const { name, email, mobile, password } = body;
-  const { role_id } = headers;
-  const salt = bcrypt.genSaltSync(10);
-  const userObj = {
-    email: email,
-    password: bcrypt.hashSync(password, salt),
-    role_id: role_id,
-    status: userStatusTypes.ACCEPTED,
-  };
-  const user = await User.create(userObj);
+// Confirms the email from the link and logs the user straight in.
+const verifyEmail = async (token, meta) => {
+  const tokenDoc = await tokenService.findValidOneTimeToken(token, tokenTypes.VERIFY_EMAIL);
+  const user =
+    tokenDoc &&
+    (await User.findOne({ where: { id: tokenDoc.user_id, is_active: true } }));
   if (!user) {
     throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      "Failed to create New Record"
+      httpStatus.BAD_REQUEST,
+      "This verification link is invalid or has expired."
     );
   }
 
-  const profileObj = {
-    email: email,
-    name: name,
-    mobile: mobile || null,
-    user_id: user.id,
-  };
-  const userProfile = await Profile.create(profileObj);
-  if (!userProfile)
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      "Failed to create New Record"
-    );
+  user.status = userStatusTypes.ACCEPTED;
+  await user.save();
+  await tokenService.revokeTokens(user.id, tokenTypes.VERIFY_EMAIL);
+  return startSession(user, meta);
+};
 
-  if (files) {
-    for (const [field, fileType] of Object.entries(UPLOAD_FIELD_TYPES)) {
-      const uploadedFiles = files[field];
-      if (!uploadedFiles || uploadedFiles.length === 0) continue;
-      for (const file of uploadedFiles) {
-        await UserAttachment.create({
-          role_id: role_id,
-          user_id: user.id,
-          title: "Profile Image",
-          file_type: fileType,
-          file_name: file.filename,
-          file_uri: `/${field}`,
-          file_size: file.size,
-        });
-      }
-    }
+// Always answers the same way, so it can't be used to probe which emails
+// have accounts. Email failures are logged, not returned, for the same reason.
+const resendVerification = async (email, role_id) => {
+  if (!email) throw new ApiError(httpStatus.BAD_REQUEST, "Please enter your email.");
+
+  const user = await User.findOne({
+    where: { email, role_id, is_active: true, status: userStatusTypes.PENDING },
+  });
+  if (!user) return;
+  if (
+    await tokenService.wasTokenIssuedRecently(
+      user.id,
+      tokenTypes.VERIFY_EMAIL,
+      EMAIL_RESEND_THROTTLE_MS
+    )
+  ) {
+    return;
   }
 
-  return {};
+  // The link never outlives the account itself.
+  const ttl = new Date(user.created_at).getTime() + UNVERIFIED_ACCOUNT_TTL_MS - Date.now();
+  if (ttl <= 0) return;
+
+  const rawToken = await tokenService.createOneTimeToken(user, tokenTypes.VERIFY_EMAIL, ttl);
+  try {
+    await emailService.sendVerificationEmail(email, verifyEmailUrl(rawToken));
+  } catch (error) {
+    logger.error(`Verification email to user ${user.id} failed: ${error.message}`);
+  }
 };
 
 const login = async (reqBody, headers) => {
   const { role_id, timezone } = headers;
   const user = await User.findOne({
-    where: {
-      email: reqBody.email,
-      is_active: true,
-      status: "ACCEPTED",
-      role_id: role_id,
-    },
+    where: { email: reqBody.email, is_active: true, role_id: role_id },
   });
-  if (!user) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Error: Customer not found. Please verify otp First"
-    );
-  }
 
-  const validPass = await bcrypt.compare(reqBody.password, user.password);
+  const validPass = user && (await bcrypt.compare(reqBody.password, user.password));
   if (!validPass) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
@@ -218,30 +164,21 @@ const login = async (reqBody, headers) => {
     );
   }
 
-  const token = await generateAuthTokens(user);
-
-  if (token) {
-    try {
-      await saveLoginTiming(user, token, reqBody, timezone);
-    } catch (error) {
-      logger.warn(
-        `saveLoginTiming failed for user ${user.id}: ${error.message}`
-      );
-    }
+  if (user.status === userStatusTypes.PENDING) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Please verify your email before logging in. Check your inbox for the verification link."
+    );
   }
-  delete token.access.id;
-  delete token.refresh.id;
-  const userObj = {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    tokens: token,
-    role_id: headers.role_id,
-  };
-  return userObj;
+  if (user.status !== userStatusTypes.ACCEPTED) {
+    throw new ApiError(httpStatus.FORBIDDEN, "This account is not active.");
+  }
+
+  return startSession(user, { ip_address: reqBody.ip_address, timezone });
 };
 
-const resetPassword = async (reqBody) => {
+// Logged-in password change (knows the old password).
+const changePassword = async (reqBody) => {
   const { confirm_password, old_password, user, tokenDoc } = reqBody;
 
   const validPass = await bcrypt.compare(old_password, user?.password);
@@ -249,31 +186,81 @@ const resetPassword = async (reqBody) => {
     throw new ApiError(httpStatus.BAD_REQUEST, "Incorrect Old Password.");
   }
 
-  const salt = bcrypt.genSaltSync(10);
-  user.password = bcrypt.hashSync(confirm_password, salt);
+  user.password = hashPassword(confirm_password);
   await user.save();
 
   await tokenDoc.destroy({ force: true });
-  const token = await generateAuthTokens(user);
+  const token = await tokenService.generateAuthTokens(user);
   return { tokens: token };
 };
 
-const forgotPassword = async (reqBody) => {
-  const { password, confirm_password, user, otpDoc } = reqBody;
+// Step 1 of "forgot password": email a reset link. Same response whether or
+// not the account exists.
+const forgotPassword = async (email, role_id) => {
+  if (!email) throw new ApiError(httpStatus.BAD_REQUEST, "Please enter your email.");
 
+  const user = await User.findOne({
+    where: { email, role_id, is_active: true, status: userStatusTypes.ACCEPTED },
+  });
+  if (!user) return;
+  if (
+    await tokenService.wasTokenIssuedRecently(
+      user.id,
+      tokenTypes.FORGOT_PASSWORD,
+      EMAIL_RESEND_THROTTLE_MS
+    )
+  ) {
+    return;
+  }
+
+  const rawToken = await tokenService.createOneTimeToken(
+    user,
+    tokenTypes.FORGOT_PASSWORD,
+    PASSWORD_RESET_TTL_MS
+  );
+  try {
+    await emailService.sendPasswordResetEmail(email, resetPasswordUrl(rawToken));
+  } catch (error) {
+    logger.error(`Password reset email to user ${user.id} failed: ${error.message}`);
+  }
+};
+
+// Step 2: set a new password from the emailed link. Signs out every
+// existing session.
+const resetPassword = async ({ token, password, confirm_password }) => {
+  if (!password || !confirm_password) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Please Enter Required Fields : [ password || confirm_password ]"
+    );
+  }
+  if (!validatePassword(password)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, PASSWORD_RULES_MESSAGE);
+  }
   if (password !== confirm_password) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      "New Password and Confirm Password Must Be Equal"
+      "Password and Confirm Password must be equal."
     );
   }
 
-  const salt = bcrypt.genSaltSync(10);
-  user.password = bcrypt.hashSync(confirm_password, salt);
-  await user.save();
+  const tokenDoc = await tokenService.findValidOneTimeToken(token, tokenTypes.FORGOT_PASSWORD);
+  const user =
+    tokenDoc &&
+    (await User.findOne({ where: { id: tokenDoc.user_id, is_active: true } }));
+  if (!user) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "This password reset link is invalid or has expired."
+    );
+  }
 
-  await otpDoc.destroy({ force: true });
-  return "";
+  await sequelize.transaction(async (transaction) => {
+    user.password = hashPassword(password);
+    await user.save({ transaction });
+    await tokenService.revokeTokens(user.id, tokenTypes.FORGOT_PASSWORD, transaction);
+    await tokenService.revokeTokens(user.id, tokenTypes.ACCESS, transaction);
+  });
 };
 
 const logout = async (reqBody, headers) => {
@@ -350,11 +337,14 @@ const saveLogoutTiming = async (tokenDoc, timezone) => {
 };
 
 module.exports = {
+  UNVERIFIED_ACCOUNT_TTL_MS,
+  PASSWORD_RULES_MESSAGE,
   register,
+  verifyEmail,
+  resendVerification,
   login,
-  resetPassword,
-  sendOTP,
-  verifyOTP,
+  changePassword,
   forgotPassword,
+  resetPassword,
   logout,
 };

@@ -5,9 +5,7 @@ const config = require("../../config/config");
 const responseWrapper = require("../../config/responseWrapper");
 
 const getAllCountry = catchAsync(async (req, res) => {
-  const body = pick(req.body, []);
   const query = pick(req.query, ["sortBy", "limit", "page"]);
-  const params = pick(req.params, []);
 
   if (!query["limit"]) {
     query["limit"] = config.defaultLimit;
@@ -21,16 +19,12 @@ const getAllCountry = catchAsync(async (req, res) => {
   const offset = (query["page"] - 1) * query["limit"];
   query["offset"] = offset;
 
-  const response = await countryService.getAllCountry(body, query, params);
+  const response = await countryService.getAllCountry(query);
   return responseWrapper(res, response, "");
 });
 
 const getCountryId = catchAsync(async (req, res) => {
-  const body = pick(req.body, []);
-  const query = pick(req.query, ["sortBy", "limit", "page"]);
-  const params = pick(req.params, ["id"]);
-
-  const response = await countryService.getCountryId(body, query, params);
+  const response = await countryService.getCountryId(req.params.id);
   return responseWrapper(res, response, "");
 });
 

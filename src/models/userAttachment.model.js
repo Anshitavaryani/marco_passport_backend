@@ -80,8 +80,6 @@ UserAttachment.init(
   }
 );
 
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
-
 UserAttachment.beforeDestroy(async (userAttachment) => {
   userAttachment.is_active = false;
 });

@@ -4,10 +4,6 @@ const { contactUsService } = require("../../services");
 const responseWrapper = require("../../config/responseWrapper");
 
 const createContactUs = catchAsync(async (req, res) => {
-  // Was discarding the return value (responseWrapper(res, '', ...)) —
-  // the service already returns the created record (just fixed to
-  // return the actual doc instead of a bare boolean too), matching
-  // the same fix just made to faq.controller.js / role.controller.js.
   const contactUsDoc = await contactUsService.createContactUs(req.body);
   return responseWrapper(
     res,
@@ -32,8 +28,6 @@ const getAllContactUs = catchAsync(async (req, res) => {
 
 const deleteContactUs = catchAsync(async (req, res) => {
   await contactUsService.deleteContactUs(req.params.id);
-  // Fixed typo: "Successfull" -> "Successful" (same typo also existed
-  // in department.controller.js, fixed there too below).
   return responseWrapper(res, "", "Deleted Successfully.");
 });
 

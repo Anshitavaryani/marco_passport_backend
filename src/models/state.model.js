@@ -87,8 +87,6 @@ State.init(
   }
 );
 
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
-
 State.beforeDestroy(async (state) => {
   state.is_active = false;
 });

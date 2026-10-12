@@ -23,16 +23,13 @@ Blog.init(
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-    // No longer unique:true — same soft-delete-vs-unique-constraint
-    // issue as blog_categories/places/place_categories. Real
-    // uniqueness now lives on slug_active below.
+    // Not unique: uniqueness is enforced on slug_active instead.
     slug: {
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-    // Mirrors `slug` while the post is active, NULL once deleted, so a
-    // soft-deleted post's old slug doesn't block a new post from
-    // reusing it.
+    // Mirrors slug while active, NULL once deleted, so a deleted row's
+    // slug can be reused (MySQL allows many NULLs in a unique index).
     slug_active: {
       type: DataTypes.STRING(255),
       allowNull: true,

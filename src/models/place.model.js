@@ -19,15 +19,13 @@ Place.init(
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-    // No longer unique:true — see slug_active below for why (same
-    // soft-delete-vs-unique-constraint issue fixed on blog_categories).
+    // Not unique: uniqueness is enforced on slug_active instead.
     slug: {
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-    // Carries the real unique constraint. Mirrors `slug` while the
-    // listing is active, NULL once it's deleted, so a soft-deleted
-    // listing's old slug doesn't block a new one from reusing it.
+    // Mirrors slug while active, NULL once deleted, so a deleted row's
+    // slug can be reused (MySQL allows many NULLs in a unique index).
     slug_active: {
       type: DataTypes.STRING(255),
       allowNull: true,
@@ -193,8 +191,6 @@ Place.beforeSave(async (place) => {
 Place.beforeDestroy(async (place) => {
   place.is_active = false;
   place.slug_active = null;
-
-  await place.save({ hooks: false });
 });
 
 module.exports = Place;

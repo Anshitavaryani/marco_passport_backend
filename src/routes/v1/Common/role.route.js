@@ -4,14 +4,7 @@ const router = express.Router();
 const { roleController } = require("../../../controllers");
 const { adminAuthMiddleware, roleMiddleware } = require("../../../middlewares");
 
-// Was completely unauthenticated on every route — the most severe
-// finding in this batch. Roles are the foundational primitive every
-// authorization check in this app resolves against (role.middleware.js's
-// isSuperAdmin/isAdmin/isEditor/etc. all query the roles table). With no
-// auth here, anyone could create, rename, or delete roles with no login
-// at all — which would undermine every other access control built on
-// top of it. Gated to isSuperAdmin specifically, the most restrictive
-// tier available, since this is the resource everything else depends on.
+// Every authorization check depends on roles, so this is super-admin only.
 const requireSuperAdmin = [
   adminAuthMiddleware.validateJWTtoken,
   roleMiddleware.isSuperAdmin,

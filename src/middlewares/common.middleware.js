@@ -3,11 +3,7 @@ const httpStatus = require("http-status");
 const catchAsync = require("../utils/catchAsync");
 const responseWrapper = require("../config/responseWrapper");
 
-// Shared by userAuth.middleware.js and adminAuth.middleware.js — this
-// exact function was duplicated verbatim in both. This file already
-// existed for exactly this purpose (it imported five things it never
-// used and exported an empty object), so this consolidates rather than
-// adds a new abstraction.
+// Shared by userAuth.middleware.js and adminAuth.middleware.js.
 const validateResetPassordBody = catchAsync(async (req, res, next) => {
   const { old_password, new_password, confirm_password } = req.body;
 

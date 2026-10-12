@@ -136,8 +136,6 @@ Country.init(
   }
 );
 
-// Removed: redundant beforeUpdate hook — see admin.model.js for why.
-
 Country.beforeDestroy(async (country) => {
   country.is_active = false;
 });
