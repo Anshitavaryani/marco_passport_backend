@@ -11,7 +11,7 @@ Blog.init(
     },
     category_id: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
       onDelete: "RESTRICT",
       onUpdate: "CASCADE",
       references: {
@@ -50,17 +50,10 @@ Blog.init(
       type: DataTypes.STRING(255),
       allowNull: true,
     },
-    written_by: {
-      type: DataTypes.STRING(150),
-      allowNull: false,
-    },
-    read_time_minutes: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
+
     is_featured: {
       type: DataTypes.BOOLEAN,
-      defaultValue: false,
+      defaultValue: true,
     },
     published_at: {
       type: DataTypes.DATE,

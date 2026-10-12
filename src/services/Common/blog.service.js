@@ -20,16 +20,19 @@ const assertCategoryExists = async (category_id) => {
 };
 
 const createBlog = async (reqBody) => {
-  const { category_id, title, description, content, written_by } = reqBody;
+  const { category_id, title, description, content } = reqBody;
 
-  if (!category_id || !title || !description || !content || !written_by) {
+  if (!title || !description || !content) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      "Please enter required fields: [category_id, title, description, content, written_by]"
+      "Please enter required fields: [title, description, content]"
     );
   }
 
-  await assertCategoryExists(category_id);
+  // Category is optional
+  if (category_id) {
+    await assertCategoryExists(category_id);
+  }
 
   const slug = reqBody.slug
     ? slugify(reqBody.slug, { lower: true, strict: true })
@@ -43,26 +46,26 @@ const createBlog = async (reqBody) => {
   }
 
   const blogObj = {
-    category_id,
+    category_id: category_id || null,
     title,
     slug,
     description,
     content,
     featured_image: reqBody.featured_image || null,
-    written_by,
-    read_time_minutes: reqBody.read_time_minutes || null,
     is_featured: !!reqBody.is_featured,
     published_at: reqBody.published_at || new Date(),
     created_by: reqBody.created_by || null,
   };
 
   const blogDoc = await Blog.create(blogObj);
+
   if (!blogDoc) {
     throw new ApiError(
       httpStatus.INTERNAL_SERVER_ERROR,
       "Failed to create new blog post"
     );
   }
+
   return blogDoc;
 };
 
@@ -104,13 +107,7 @@ const updateBlog = async (reqBody, id) => {
     blogDoc["featured_image"] = reqBody.featured_image;
   }
 
-  if (reqBody.written_by) {
-    blogDoc["written_by"] = reqBody.written_by;
-  }
 
-  if (typeof reqBody.read_time_minutes !== "undefined") {
-    blogDoc["read_time_minutes"] = reqBody.read_time_minutes;
-  }
 
   if (typeof reqBody.is_featured !== "undefined") {
     blogDoc["is_featured"] = !!reqBody.is_featured;
