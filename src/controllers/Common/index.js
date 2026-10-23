@@ -13,6 +13,7 @@ const placeController = require('./place.controller');
 const reviewController = require('./review.controller');
 const businessSubmissionController = require('./businessSubmission.controller');
 const mediaController = require('./media.controller')
+const newsletterController = require('./newsletter.controller');
 
 module.exports = {
     roleController,
@@ -28,5 +29,6 @@ module.exports = {
     placeController,
     reviewController,
     businessSubmissionController,
-    mediaController
+    mediaController,
+    newsletterController
 };

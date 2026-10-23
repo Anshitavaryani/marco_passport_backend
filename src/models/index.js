@@ -15,6 +15,7 @@ const userLoginTiming = require("./user_login_timings.model");
 
 const ContactUs = require("./contactUs.model");
 const Faq = require("./faq.model");
+const NewsletterSubscriber = require("./newsletterSubscriber.model");
 
 const BlogCategory = require("./blogCategory.model");
 const Blog = require("./blog.model");
@@ -45,6 +46,7 @@ module.exports = {
 
   ContactUs,
   Faq,
+  NewsletterSubscriber,
 
   BlogCategory,
   Blog,

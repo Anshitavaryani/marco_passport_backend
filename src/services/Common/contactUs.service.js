@@ -2,10 +2,46 @@ const httpStatus = require("http-status");
 
 const { ContactUs } = require("../../models");
 const ApiError = require("../../utils/ApiError");
+const validateEmail = require("../../helpers/validateEmail");
 
+const MAX_NAME_LENGTH = 150;
+const MAX_SUBJECT_LENGTH = 200;
+const MAX_MESSAGE_LENGTH = 5000;
+
+const text = (value) => (typeof value === "string" ? value.trim() : "");
+
+// The public contact form: name, email and message are required.
 const createContactUs = async (reqBody) => {
+  const name = text(reqBody.name);
+  const email = text(reqBody.email).toLowerCase();
+  const subject = text(reqBody.subject);
+  const message = text(reqBody.message);
+
+  if (!name || !email || !message) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Please enter required fields: [name, email, message]"
+    );
+  }
+  if (!validateEmail(email)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Please enter a valid email address.");
+  }
+  if (
+    name.length > MAX_NAME_LENGTH ||
+    subject.length > MAX_SUBJECT_LENGTH ||
+    message.length > MAX_MESSAGE_LENGTH
+  ) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `Please keep the name under ${MAX_NAME_LENGTH} characters, the subject under ${MAX_SUBJECT_LENGTH} and the message under ${MAX_MESSAGE_LENGTH}.`
+    );
+  }
+
   const contactUsObj = {
-    email: reqBody.email,
+    name,
+    email,
+    subject: subject || null,
+    message,
     mobile: reqBody.mobile,
     address: reqBody.address,
   };
@@ -36,8 +72,18 @@ const updateContactUs = async (reqBody, id) => {
 
 const getAllContactUs = async () => {
   const contactUsDoc = await ContactUs.findAll({
-    attributes: ["id", "email", "address", "mobile"],
+    attributes: [
+      "id",
+      "name",
+      "email",
+      "subject",
+      "message",
+      "address",
+      "mobile",
+      "created_at",
+    ],
     where: { is_active: true },
+    order: [["created_at", "DESC"]],
   });
   return contactUsDoc;
 };

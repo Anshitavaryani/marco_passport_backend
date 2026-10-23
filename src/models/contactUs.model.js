@@ -9,9 +9,23 @@ ContactUs.init(
       autoIncrement: true,
       primaryKey: true,
     },
+    // name, subject and message come from the public contact form. They're
+    // nullable because rows saved before the form was wired don't have them.
+    name: {
+      type: DataTypes.STRING(150),
+      allowNull: true,
+    },
     email: {
       type: DataTypes.STRING(100),
       allowNull: false,
+    },
+    subject: {
+      type: DataTypes.STRING(200),
+      allowNull: true,
+    },
+    message: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     },
     address: {
       type: DataTypes.TEXT,

@@ -10,6 +10,7 @@ const blogCategoryRoute = require("./blogCategory.route");
 const placeCategoryRoute = require("./placeCategory.route");
 const exploreRoute = require("./explore.route");
 const businessSubmissionRoute = require("./businessSubmission.route");
+const newsletterRoute = require("./newsletter.route");
 
 const commonRoutes = [
   {
@@ -59,6 +60,10 @@ const commonRoutes = [
   {
     path: "/business-submission",
     route: businessSubmissionRoute,
+  },
+  {
+    path: "/newsletter",
+    route: newsletterRoute,
   },
 ];
 
