@@ -23,11 +23,13 @@ const authLimiter = rateLimit({
 
 // Endpoints that send an email (register, resend verification, forgot
 // password) answer 200 whatever happens, so authLimiter would never count
-// them. This one counts every request per IP. Production only.
-const emailLimiter =
+// them. These count every request per IP: 5 an hour, with each endpoint
+// keeping its own count, so a sign-up and a few resends don't block a
+// password reset. Production only.
+const createEmailLimiter = () =>
   config.env === "production"
     ? rateLimit({
-        windowMs: 15 * 60 * 1000,
+        windowMs: 60 * 60 * 1000,
         max: 5,
         standardHeaders: "draft-7",
         legacyHeaders: false,
@@ -42,7 +44,13 @@ const emailLimiter =
       })
     : (req, res, next) => next();
 
+const registerEmailLimiter = createEmailLimiter();
+const resendVerificationLimiter = createEmailLimiter();
+const forgotPasswordLimiter = createEmailLimiter();
+
 module.exports = {
   authLimiter,
-  emailLimiter,
+  registerEmailLimiter,
+  resendVerificationLimiter,
+  forgotPasswordLimiter,
 };

@@ -59,6 +59,12 @@ User.init(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    // Last password change or reset; another one isn't allowed until
+    // PASSWORD_CHANGE_COOLDOWN_MS has passed (see auth.service.js).
+    password_changed_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
     is_proof_verify: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,

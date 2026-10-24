@@ -41,9 +41,9 @@ Base URL for everything below: `<API>/api/v1`.
      show the same "check your inbox / resend" screen.
    - 503 → the email couldn't be sent; nothing was saved; ask them to retry.
    - Password rules: ≥ 8 chars, ≥ 2 digits, no spaces, ≤ 72 bytes.
-2. The email links to **`<FRONTEND_URL>/verify-email?token=<64 hex chars>`**.
-   Build this page:
-   - On load, `POST /user/auth/verify-email` `{ token }` (POST, not GET, so
+2. The email links to **`<FRONTEND_URL>/?auth=verify-email&token=<64 hex chars>`**,
+   which opens the verify dialog over the home page:
+   - On open, `POST /user/auth/verify-email` `{ token }` (POST, not GET, so
      email link scanners can't verify accounts on their own).
    - 200 → `data` is the **same shape as login** (§2.2): store the token, the
      user is now logged in. Then run the "save pending draft" step (§3.3) and
@@ -52,6 +52,9 @@ Base URL for everything below: `<API>/api/v1`.
      resend form.
 3. `POST /user/auth/resend-verification` `{ email }` → always 200 with a
    generic message (by design). The backend ignores repeats within 60s.
+   Register, resend-verification and forgot-password each allow 5 requests
+   an hour per IP in production (counted separately); past that they answer
+   **429** "Too many email requests".
 4. Accounts not verified within **24 hours** of sign-up are deleted
    automatically; the user then has to register again. Mention "the link
    expires in 24 hours" on the check-your-inbox screen.
@@ -67,23 +70,27 @@ Base URL for everything below: `<API>/api/v1`.
 
 1. "Forgot password?" → email field → `POST /user/auth/forgot-password` `{ email }`.
    Always 200 with a generic message ("If an account exists…"). Show it as is.
-2. The email links to **`<FRONTEND_URL>/reset-password?token=<64 hex chars>`**
-   (valid **1 hour**, single use). Build this page with **New password** and
-   **Confirm password** fields, then
+2. The email links to **`<FRONTEND_URL>/?auth=reset-password&token=<64 hex chars>`**
+   (valid **1 hour**, single use), which opens the reset dialog with
+   **New password** and **Confirm password** fields, then
    `POST /user/auth/reset-password` `{ token, password, confirm_password }`.
    - 200 → "Password changed, please log in" → open the login popup.
    - 400 → show `message` (rule violation, mismatch, or invalid/expired link;
      for the last one offer "send a new link").
+   - **429** → the password was changed or reset in the last 12 hours; show
+     `message`, which says how long to wait.
    - Success signs the user out everywhere, so clear any stored token.
 
 ### 2.4 Other user auth routes (unchanged)
 
 `POST /user/auth/change-password` (logged in) `{ old_password, new_password, confirm_password }`
-→ returns new `tokens` (the old token is revoked; replace it).
+→ returns new `tokens` (the old token is revoked; replace it). Same 12-hour
+limit as a reset: **429** with a `message` saying how long to wait.
 `GET /user/auth/logout`, `GET /user/profile`, `POST /user/notifications`, `DELETE /user/deactivate`.
 
-The routes `/verify-email` and `/reset-password` must exist on the site at
-exactly those paths. The backend builds the links from `FRONTEND_URL`.
+The site has no separate auth pages: the links above open dialogs over the
+home page, and the old `/verify-email` and `/reset-password` paths redirect
+there (keeping the token). The backend builds the links from `FRONTEND_URL`.
 
 ## 3. My Passport = itineraries
 
@@ -155,14 +162,14 @@ Guests can open My Passport and add places without an account:
 2. **Save** (or any action that needs an account) → if not logged in, open the
    **login popup** (with "Create account" and "Forgot password" links) and keep
    the draft.
-3. After a successful login (popup or `/verify-email` page): if a draft exists,
+3. After a successful login (login popup or verify dialog): if a draft exists,
    `POST /user/itineraries` with it (only `name`, dates and
    `items[{ place_id, visit_date }]`), clear the draft on 201, and navigate to
    the new itinerary. If the POST fails with 400 (e.g. a place was
    unlisted meanwhile), keep the draft and show the message.
 4. If they choose "Create account" in the popup: after register they must
-   verify by email first. The verify link opens in the same browser, so
-   `/verify-email` will find the draft in `localStorage` and save it (step 3).
+   verify by email first. The verify link opens in the same browser, so the
+   verify dialog will find the draft in `localStorage` and save it (step 3).
 5. On a 401 while editing a saved itinerary (session expired), keep unsaved
    edits in memory, show the login popup, then retry the PUT.
 

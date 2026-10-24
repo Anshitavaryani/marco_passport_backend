@@ -19,6 +19,8 @@ const UNVERIFIED_ACCOUNT_TTL_MS = 24 * HOUR_MS;
 const PASSWORD_RESET_TTL_MS = HOUR_MS;
 // Minimum gap between "send me another email" requests per user.
 const EMAIL_RESEND_THROTTLE_MS = 60 * 1000;
+// One password change or reset per user in this window.
+const PASSWORD_CHANGE_COOLDOWN_MS = 12 * HOUR_MS;
 
 const PASSWORD_RULES_MESSAGE =
   "Password should have a minimum length of 8 characters and must have at least 2 digits and No Blank Space";
@@ -35,8 +37,27 @@ const isValidTimezone = (tz) => {
 
 const hashPassword = (password) => bcrypt.hashSync(password, bcrypt.genSaltSync(10));
 
-const verifyEmailUrl = (token) => `${config.frontendUrl}/verify-email?token=${token}`;
-const resetPasswordUrl = (token) => `${config.frontendUrl}/reset-password?token=${token}`;
+// The site has no separate auth pages: these open the matching dialog over
+// the home page. (Old /verify-email and /reset-password links redirect there.)
+const verifyEmailUrl = (token) =>
+  `${config.frontendUrl}/?auth=verify-email&token=${encodeURIComponent(token)}`;
+const resetPasswordUrl = (token) =>
+  `${config.frontendUrl}/?auth=reset-password&token=${encodeURIComponent(token)}`;
+
+// Throws if the user changed or reset their password within the cooldown.
+const assertPasswordChangeAllowed = (user) => {
+  const lastChange = user.password_changed_at ? new Date(user.password_changed_at).getTime() : 0;
+  const waitMs = lastChange + PASSWORD_CHANGE_COOLDOWN_MS - Date.now();
+  if (waitMs <= 0) return;
+  const wait =
+    waitMs < HOUR_MS
+      ? `${Math.ceil(waitMs / 60000)} minutes`
+      : `${Math.max(1, Math.round(waitMs / HOUR_MS))} hours`;
+  throw new ApiError(
+    httpStatus.TOO_MANY_REQUESTS,
+    `You changed your password recently. You can change it again in about ${wait}.`
+  );
+};
 
 // Session payload shared by login and verify-email (which logs the user in).
 const startSession = async (user, { ip_address, timezone } = {}) => {
@@ -181,12 +202,15 @@ const login = async (reqBody, headers) => {
 const changePassword = async (reqBody) => {
   const { confirm_password, old_password, user, tokenDoc } = reqBody;
 
+  assertPasswordChangeAllowed(user);
+
   const validPass = await bcrypt.compare(old_password, user?.password);
   if (!validPass) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Incorrect Old Password.");
   }
 
   user.password = hashPassword(confirm_password);
+  user.password_changed_at = new Date();
   await user.save();
 
   await tokenDoc.destroy({ force: true });
@@ -254,9 +278,11 @@ const resetPassword = async ({ token, password, confirm_password }) => {
       "This password reset link is invalid or has expired."
     );
   }
+  assertPasswordChangeAllowed(user);
 
   await sequelize.transaction(async (transaction) => {
     user.password = hashPassword(password);
+    user.password_changed_at = new Date();
     await user.save({ transaction });
     await tokenService.revokeTokens(user.id, tokenTypes.FORGOT_PASSWORD, transaction);
     await tokenService.revokeTokens(user.id, tokenTypes.ACCESS, transaction);

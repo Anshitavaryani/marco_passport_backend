@@ -3,19 +3,23 @@ const router = express.Router();
 
 const { userAuthController } = require("../../../controllers");
 const { userAuthMiddleware } = require("../../../middlewares");
-const { emailLimiter } = require("../../../middlewares/rateLimiter");
+const {
+  registerEmailLimiter,
+  resendVerificationLimiter,
+  forgotPasswordLimiter,
+} = require("../../../middlewares/rateLimiter");
 
 router.use(userAuthMiddleware.setRoleIdIfNotPresent);
 
 router.post(
   "/register",
-  [emailLimiter, userAuthMiddleware.validateRegisterUserBody],
+  [registerEmailLimiter, userAuthMiddleware.validateRegisterUserBody],
   userAuthController.register,
 );
 router.post("/verify-email", userAuthController.verifyEmail);
 router.post(
   "/resend-verification",
-  emailLimiter,
+  resendVerificationLimiter,
   userAuthController.resendVerification,
 );
 router.post(
@@ -23,7 +27,7 @@ router.post(
   [userAuthMiddleware.validateSignInReqBody],
   userAuthController.login,
 );
-router.post("/forgot-password", emailLimiter, userAuthController.forgotPassword);
+router.post("/forgot-password", forgotPasswordLimiter, userAuthController.forgotPassword);
 router.post("/reset-password", userAuthController.resetPassword);
 router.post(
   "/change-password",
