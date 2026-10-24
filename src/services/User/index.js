@@ -1,9 +1,9 @@
 const userAuthService = require('./auth.service');
 const userService = require('./user.service');
-const itineraryService = require('./itinerary.service');
+const passportService = require('./passport.service');
 
 module.exports = {
     userAuthService,
     userService,
-    itineraryService
+    passportService
 };

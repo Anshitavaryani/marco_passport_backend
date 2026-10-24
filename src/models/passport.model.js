@@ -1,9 +1,10 @@
 const { Sequelize, DataTypes, Model } = require("sequelize");
 const sequelize = require("../config/central.db");
 
-// A user's trip plan ("My Passport" on the site). A user can have many.
-class Itinerary extends Model {}
-Itinerary.init(
+// A user's passport: a trip plan ("My Passport" on the site). A user can
+// have many.
+class Passport extends Model {}
+Passport.init(
   {
     id: {
       type: DataTypes.BIGINT.UNSIGNED,
@@ -44,6 +45,9 @@ Itinerary.init(
   },
   {
     sequelize,
+    // Table and index names predate the rename to "passport"; the DB was
+    // left as is. Keep tableName explicit: by default this model would map
+    // to `passports`, the legacy pre-October table.
     tableName: "itineraries",
     timestamps: true,
     underscored: true,
@@ -54,4 +58,4 @@ Itinerary.init(
   }
 );
 
-module.exports = Itinerary;
+module.exports = Passport;

@@ -1,19 +1,21 @@
 const { Sequelize, DataTypes, Model } = require("sequelize");
 const sequelize = require("../config/central.db");
 
-// One stop in an itinerary. `position` is the visiting order (0-based),
+// One stop in a passport. `position` is the visiting order (0-based),
 // which is also the order the map draws the route in.
-class ItineraryItem extends Model {}
-ItineraryItem.init(
+class PassportItem extends Model {}
+PassportItem.init(
   {
     id: {
       type: DataTypes.BIGINT.UNSIGNED,
       autoIncrement: true,
       primaryKey: true,
     },
-    itinerary_id: {
+    passport_id: {
       type: DataTypes.BIGINT.UNSIGNED,
       allowNull: false,
+      // The column kept its pre-rename name.
+      field: "itinerary_id",
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
       references: {
@@ -52,6 +54,10 @@ ItineraryItem.init(
   },
   {
     sequelize,
+    // Table, column and index names predate the rename to "passport"; the
+    // DB was left as is. Keep tableName explicit (the default would be a new
+    // `passport_items` table). Index `fields` are column names, not
+    // attribute names.
     tableName: "itinerary_items",
     timestamps: true,
     underscored: true,
@@ -68,4 +74,4 @@ ItineraryItem.init(
   }
 );
 
-module.exports = ItineraryItem;
+module.exports = PassportItem;

@@ -10,7 +10,7 @@ const RUN_EVERY_MS = 60 * 60 * 1000;
 const FIRST_RUN_DELAY_MS = 60 * 1000; // give the DB connection time to come up
 
 // Hard-deletes accounts that never verified their email within 24h of
-// signing up (they can't log in, so they have no itineraries or reviews),
+// signing up (they can't log in, so they have no passports or reviews),
 // and clears out expired email-link tokens.
 const cleanupUnverifiedUsers = async () => {
   const cutoff = new Date(Date.now() - UNVERIFIED_ACCOUNT_TTL_MS);

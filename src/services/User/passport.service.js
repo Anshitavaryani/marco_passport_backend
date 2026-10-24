@@ -1,18 +1,18 @@
 const httpStatus = require("http-status");
 
-const { Itinerary, ItineraryItem, Place } = require("../../models");
+const { Passport, PassportItem, Place } = require("../../models");
 const sequelize = require("../../config/central.db");
 const ApiError = require("../../utils/ApiError");
 
-// Upper bound on stops per itinerary. Keeps the whole route drawable by a
+// Upper bound on stops per passport. Keeps the whole route drawable by a
 // single Google Maps Embed "directions" iframe (origin + destination +
 // waypoints), which is the free way the frontend shows the map.
 const MAX_ITEMS = 20;
 const MAX_NAME_LENGTH = 150;
-const DEFAULT_NAME = "My itinerary";
+const DEFAULT_NAME = "My passport";
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-// Only what the itinerary screen and map need. The free Embed map locates
+// Only what the passport screen and map need. The free Embed map locates
 // each stop by "name, address", so no paid Google API call is ever needed.
 const PLACE_ATTRIBUTES = [
   "id",
@@ -73,7 +73,7 @@ const parseItems = async (items) => {
     throw badRequest("items must be an array of { place_id, visit_date }.");
   }
   if (items.length > MAX_ITEMS) {
-    throw badRequest(`An itinerary can have at most ${MAX_ITEMS} places.`);
+    throw badRequest(`A passport can have at most ${MAX_ITEMS} places.`);
   }
 
   const rows = items.map((item, index) => ({
@@ -84,7 +84,7 @@ const parseItems = async (items) => {
 
   const placeIds = rows.map((row) => row.place_id);
   if (new Set(placeIds).size !== placeIds.length) {
-    throw badRequest("The same place can only be added once per itinerary.");
+    throw badRequest("The same place can only be added once per passport.");
   }
 
   if (placeIds.length) {
@@ -98,47 +98,47 @@ const parseItems = async (items) => {
   return rows;
 };
 
-const findOwnedItinerary = async (userId, id, options = {}) => {
-  const itinerary = await Itinerary.findOne({
+const findOwnedPassport = async (userId, id, options = {}) => {
+  const passport = await Passport.findOne({
     where: { id, user_id: userId },
     ...options,
   });
-  if (!itinerary) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Itinerary not found.");
+  if (!passport) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Passport not found.");
   }
-  return itinerary;
+  return passport;
 };
 
 // Items whose place has since been unlisted (soft-deleted) are left out.
-const toResponse = (itinerary) => {
-  const json = itinerary.toJSON();
+const toResponse = (passport) => {
+  const json = passport.toJSON();
   json.items = (json.items || []).filter((item) => item.place);
   json.item_count = json.items.length;
   return json;
 };
 
-const getItinerary = async (userId, id) => {
-  const itinerary = await findOwnedItinerary(userId, id, {
+const getPassport = async (userId, id) => {
+  const passport = await findOwnedPassport(userId, id, {
     include: [
       {
-        model: ItineraryItem,
+        model: PassportItem,
         as: "items",
         attributes: ["id", "place_id", "position", "visit_date"],
         include: [{ model: Place, as: "place", attributes: PLACE_ATTRIBUTES }],
       },
     ],
-    order: [[{ model: ItineraryItem, as: "items" }, "position", "ASC"]],
+    order: [[{ model: PassportItem, as: "items" }, "position", "ASC"]],
   });
-  return toResponse(itinerary);
+  return toResponse(passport);
 };
 
-const listItineraries = async (userId) => {
-  const itineraries = await Itinerary.findAll({
+const listPassports = async (userId) => {
+  const passports = await Passport.findAll({
     where: { user_id: userId },
     attributes: ["id", "name", "start_date", "end_date", "created_at", "updated_at"],
     include: [
       {
-        model: ItineraryItem,
+        model: PassportItem,
         as: "items",
         attributes: ["id", "place_id", "position", "visit_date"],
         include: [
@@ -152,107 +152,107 @@ const listItineraries = async (userId) => {
     ],
     order: [
       ["updated_at", "DESC"],
-      [{ model: ItineraryItem, as: "items" }, "position", "ASC"],
+      [{ model: PassportItem, as: "items" }, "position", "ASC"],
     ],
   });
-  return itineraries.map(toResponse);
+  return passports.map(toResponse);
 };
 
 // Also how a guest's draft gets saved after the login popup: one request
 // with the name and every place they picked.
-const createItinerary = async (userId, body) => {
+const createPassport = async (userId, body) => {
   const name = parseName(body.name) || DEFAULT_NAME;
   const startDate = parseDate(body.start_date, "start_date") ?? null;
   const endDate = parseDate(body.end_date, "end_date") ?? null;
   assertDateRange(startDate, endDate);
   const items = await parseItems(body.items ?? []);
 
-  const itinerary = await sequelize.transaction(async (transaction) => {
-    const created = await Itinerary.create(
+  const passport = await sequelize.transaction(async (transaction) => {
+    const created = await Passport.create(
       { user_id: userId, name, start_date: startDate, end_date: endDate },
       { transaction }
     );
     if (items.length) {
-      await ItineraryItem.bulkCreate(
-        items.map((item) => ({ ...item, itinerary_id: created.id })),
+      await PassportItem.bulkCreate(
+        items.map((item) => ({ ...item, passport_id: created.id })),
         { transaction }
       );
     }
     return created;
   });
-  return getItinerary(userId, itinerary.id);
+  return getPassport(userId, passport.id);
 };
 
 // Partial update. Sending `items` replaces the whole ordered list, which is
 // how the edit screen saves reordering, removals and visit-date changes in
 // one request.
-const updateItinerary = async (userId, id, body) => {
-  const itinerary = await findOwnedItinerary(userId, id);
+const updatePassport = async (userId, id, body) => {
+  const passport = await findOwnedPassport(userId, id);
 
   const name = parseName(body.name);
   const startDate = parseDate(body.start_date, "start_date");
   const endDate = parseDate(body.end_date, "end_date");
-  if (name !== undefined) itinerary.name = name;
-  if (startDate !== undefined) itinerary.start_date = startDate;
-  if (endDate !== undefined) itinerary.end_date = endDate;
-  assertDateRange(itinerary.start_date, itinerary.end_date);
+  if (name !== undefined) passport.name = name;
+  if (startDate !== undefined) passport.start_date = startDate;
+  if (endDate !== undefined) passport.end_date = endDate;
+  assertDateRange(passport.start_date, passport.end_date);
 
   const items = body.items !== undefined ? await parseItems(body.items) : null;
 
   await sequelize.transaction(async (transaction) => {
     if (items) {
-      await ItineraryItem.destroy({ where: { itinerary_id: itinerary.id }, transaction });
+      await PassportItem.destroy({ where: { passport_id: passport.id }, transaction });
       if (items.length) {
-        await ItineraryItem.bulkCreate(
-          items.map((item) => ({ ...item, itinerary_id: itinerary.id })),
+        await PassportItem.bulkCreate(
+          items.map((item) => ({ ...item, passport_id: passport.id })),
           { transaction }
         );
       }
       // Bump updated_at even if only the items changed.
-      itinerary.changed("updated_at", true);
+      passport.changed("updated_at", true);
     }
-    await itinerary.save({ transaction });
+    await passport.save({ transaction });
   });
-  return getItinerary(userId, itinerary.id);
+  return getPassport(userId, passport.id);
 };
 
-// Appends one place (the "Add to itinerary" button on a listing page).
+// Appends one place (the "Add to passport" button on a listing page).
 const addItem = async (userId, id, body) => {
-  const itinerary = await findOwnedItinerary(userId, id);
+  const passport = await findOwnedPassport(userId, id);
   const [item] = await parseItems([body]);
 
-  const existing = await ItineraryItem.findAll({
-    where: { itinerary_id: itinerary.id },
+  const existing = await PassportItem.findAll({
+    where: { passport_id: passport.id },
     attributes: ["place_id", "position"],
   });
   if (existing.some((row) => Number(row.place_id) === item.place_id)) {
-    throw badRequest("This place is already in the itinerary.");
+    throw badRequest("This place is already in the passport.");
   }
   if (existing.length >= MAX_ITEMS) {
-    throw badRequest(`An itinerary can have at most ${MAX_ITEMS} places.`);
+    throw badRequest(`A passport can have at most ${MAX_ITEMS} places.`);
   }
 
   const nextPosition = existing.reduce((max, row) => Math.max(max, row.position + 1), 0);
-  await ItineraryItem.create({ ...item, itinerary_id: itinerary.id, position: nextPosition });
-  itinerary.changed("updated_at", true);
-  await itinerary.save();
-  return getItinerary(userId, itinerary.id);
+  await PassportItem.create({ ...item, passport_id: passport.id, position: nextPosition });
+  passport.changed("updated_at", true);
+  await passport.save();
+  return getPassport(userId, passport.id);
 };
 
-const deleteItinerary = async (userId, id) => {
-  const itinerary = await findOwnedItinerary(userId, id);
+const deletePassport = async (userId, id) => {
+  const passport = await findOwnedPassport(userId, id);
   await sequelize.transaction(async (transaction) => {
-    await ItineraryItem.destroy({ where: { itinerary_id: itinerary.id }, transaction });
-    await itinerary.destroy({ transaction });
+    await PassportItem.destroy({ where: { passport_id: passport.id }, transaction });
+    await passport.destroy({ transaction });
   });
 };
 
 module.exports = {
   MAX_ITEMS,
-  listItineraries,
-  getItinerary,
-  createItinerary,
-  updateItinerary,
+  listPassports,
+  getPassport,
+  createPassport,
+  updatePassport,
   addItem,
-  deleteItinerary,
+  deletePassport,
 };

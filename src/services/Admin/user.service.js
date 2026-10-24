@@ -6,8 +6,8 @@ const {
   User,
   Profile,
   Review,
-  Itinerary,
-  ItineraryItem,
+  Passport,
+  PassportItem,
   Place,
 } = require("../../models");
 const ApiError = require("../../utils/ApiError");
@@ -39,6 +39,8 @@ const getAllUsers = async (query) => {
           )`),
           "reviews_count",
         ],
+        // Passports live in the `itineraries` table, and the admin panel
+        // reads the count as `itineraries_count`; both kept their old names.
         [
           sequelize.literal(`(
             SELECT COUNT(*) FROM \`itineraries\` i WHERE i.user_id = \`User\`.\`id\`
@@ -102,12 +104,12 @@ const getUserById = async (id) => {
         ],
       },
       {
-        model: Itinerary,
-        as: "itineraries",
+        model: Passport,
+        as: "itineraries", // response key the admin panel reads
         attributes: ["id", "name", "start_date", "end_date", "created_at"],
         include: [
           {
-            model: ItineraryItem,
+            model: PassportItem,
             as: "items",
             attributes: ["id", "place_id", "position", "visit_date"],
             include: [

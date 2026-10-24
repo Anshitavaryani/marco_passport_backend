@@ -25,8 +25,8 @@ const PlaceCategoryMap = require("./placeCategoryMap.model");
 const Review = require("./review.model");
 
 const BusinessSubmission = require("./businessSubmission.model");
-const Itinerary = require("./itinerary.model");
-const ItineraryItem = require("./itineraryItem.model");
+const Passport = require("./passport.model");
+const PassportItem = require("./passportItem.model");
 
 module.exports = {
   Country,
@@ -57,8 +57,8 @@ module.exports = {
   Review,
 
   BusinessSubmission,
-  Itinerary,
-  ItineraryItem,
+  Passport,
+  PassportItem,
 };
 
 function initTableRelation() {
@@ -132,17 +132,21 @@ function initTableRelation() {
   User.hasMany(Review, { foreignKey: "user_id", as: "user_reviews" });
   Review.belongsTo(User, { foreignKey: "user_id", as: "reviewer" });
 
-  User.hasMany(Itinerary, { foreignKey: "user_id", as: "itineraries" });
-  Itinerary.belongsTo(User, { foreignKey: "user_id", as: "owner" });
+  // The alias stays "itineraries": it's the key the admin user-detail
+  // response (GET /admin/user/:id) returns passports under.
+  User.hasMany(Passport, { foreignKey: "user_id", as: "itineraries" });
+  Passport.belongsTo(User, { foreignKey: "user_id", as: "owner" });
 
-  Itinerary.hasMany(ItineraryItem, { foreignKey: "itinerary_id", as: "items" });
-  ItineraryItem.belongsTo(Itinerary, {
-    foreignKey: "itinerary_id",
-    as: "itinerary",
+  // foreignKey must be the attribute (passport_id), not its column
+  // (itinerary_id): a column name here would add a second attribute.
+  Passport.hasMany(PassportItem, { foreignKey: "passport_id", as: "items" });
+  PassportItem.belongsTo(Passport, {
+    foreignKey: "passport_id",
+    as: "passport",
   });
 
-  Place.hasMany(ItineraryItem, { foreignKey: "place_id", as: "itinerary_items" });
-  ItineraryItem.belongsTo(Place, { foreignKey: "place_id", as: "place" });
+  Place.hasMany(PassportItem, { foreignKey: "place_id", as: "passport_items" });
+  PassportItem.belongsTo(Place, { foreignKey: "place_id", as: "place" });
 }
 
 initTableRelation();

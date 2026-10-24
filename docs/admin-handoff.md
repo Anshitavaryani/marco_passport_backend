@@ -13,7 +13,7 @@ show `message` on errors.
 | Area | Change | What to do |
 |---|---|---|
 | Payments | All `/payment/*` endpoints removed (incl. dashboard `/payment/count`, `/payment/sum`). The app has no payments. | Remove payment widgets, screens and Stripe code. |
-| Passport | Replaced by **itineraries**. | Users screens: see §4 "Users". |
+| Passport | One flat list per user became **many passports** per user (named trip plans with ordered places). The users endpoints return them under the keys `itineraries_count` / `itineraries`, which keep those names. | Users screens: see §4 "Users". |
 | Auth | `GET /admin/user`, `GET /admin/user/:id`, `POST /admin/user`, `GET /explore/admin`, `GET /explore/admin/:id` and `GET /business-submission` **now require the admin token** (they were public). | Make sure these calls send `x-access-token`. |
 | Places | **`address` is required** on create (400 without it) and can't be blanked on update. | Mark Address required in the place form. |
 | Uploads | Only the **`images`** form field is accepted (≤10 files, ≤25 MB each, jpeg/jpg/png/gif/webp). Other fields (`videos`, `docs`, `gifs`, `songs`) are rejected. Bad uploads are now **400 with a message** (they were 500). `/videos`, `/gifs`, `/docs`, `/songs` URLs no longer exist. | Use `images` everywhere; show `message` on upload errors. |
@@ -77,12 +77,13 @@ with 401 anyway.
 ### Users (admin): site members
 - `GET /admin/user?page=1&limit=15&sortBy=ASC|DESC&search=<email or name>` →
   `{ count, rows: [{ id, email, role_id, status, created_at, reviews_count, itineraries_count, user_profile: { id, name, mobile, is_active, created_at } }] }`.
+  `itineraries_count` is the number of passports the member has.
   **Note:** the list only includes members with at least one review or
-  itinerary (existing backend behaviour).
+  passport (existing backend behaviour).
 - `GET /admin/user/:id` → the user plus `user_profile`,
   `user_reviews[{ id, place_id, rating, comment, created_at, review_place{ id, name, type } }]` and
   `itineraries[{ id, name, start_date, end_date, created_at, items[{ id, place_id, position, visit_date, place{ id, name, type } }] }]`
-  (items in visiting order by `position`).
+  (the member's passports; items in visiting order by `position`).
 - Delete (soft): `POST /admin/user` `{ user_id: [1, 2, 3] }`.
 - `status`: `PENDING` = signed up but hasn't verified their email (deleted
   automatically after 24h); `ACCEPTED` = active.
@@ -105,11 +106,11 @@ with 401 anyway.
     of them become `gallery_images`. Without an upload you can send
     `featured_image` / `gallery_images` (paths) instead.
   - on update, `category_ids` replaces the place's categories.
-- **Address matters:** members' itinerary maps pin each place using
+- **Address matters:** members' passport maps pin each place using
   "name, address". Ask for a complete address (street, area, island). If a
   pin shows up in the wrong spot, a fuller address fixes it.
   Latitude/longitude are optional.
-- Members can only add these admin-created places to their itineraries.
+- Members can only add these admin-created places to their passports.
 
 ### Place categories (admin; GET is public)
 - `GET /place-category?type=business|place`, `GET /place-category/:id`

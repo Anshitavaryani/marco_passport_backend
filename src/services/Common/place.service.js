@@ -6,8 +6,8 @@ const {
   Place,
   PlaceCategory,
   Review,
-  Itinerary,
-  ItineraryItem,
+  Passport,
+  PassportItem,
 } = require("../../models");
 const config = require("../../config/config");
 const ApiError = require("../../utils/ApiError");
@@ -66,16 +66,17 @@ const getSortOrder = (type, sort) => {
   }
 };
 
-// Which of these places are already in any of the user's itineraries.
-const placeIdsInUserItineraries = async (userId, placeIds) => {
+// Which of these places are already in any of the user's passports.
+// Responses expose this as `is_in_itinerary`, a key that kept its old name.
+const placeIdsInUserPassports = async (userId, placeIds) => {
   if (!placeIds.length) return new Set();
-  const rows = await ItineraryItem.findAll({
+  const rows = await PassportItem.findAll({
     where: { place_id: placeIds },
     attributes: ["place_id"],
     include: [
       {
-        model: Itinerary,
-        as: "itinerary",
+        model: Passport,
+        as: "passport",
         where: { user_id: userId },
         attributes: [],
       },
@@ -117,7 +118,7 @@ const createPlace = async (reqBody) => {
     );
   }
 
-  // The address is what itinerary maps use to place the pin, so every
+  // The address is what passport maps use to place the pin, so every
   // listing needs one.
   const address = typeof reqBody.address === "string" ? reqBody.address.trim() : "";
   if (!name || !short_description || !address) {
@@ -422,7 +423,7 @@ const getAllPlaces = async (filters = {}, userId) => {
   let places = rows.map((row) => row.toJSON());
 
   if (userId) {
-    const saved = await placeIdsInUserItineraries(
+    const saved = await placeIdsInUserPassports(
       userId,
       places.map((p) => p.id)
     );
@@ -480,7 +481,7 @@ const findPlaceBySlug = async (slug, expectedType, userId) => {
   result.similar_places = similarPlaces;
 
   if (userId) {
-    const saved = await placeIdsInUserItineraries(userId, [placeDoc.id]);
+    const saved = await placeIdsInUserPassports(userId, [placeDoc.id]);
     result.is_in_itinerary = saved.has(placeDoc.id);
   }
 

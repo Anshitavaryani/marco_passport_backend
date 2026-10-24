@@ -92,8 +92,9 @@ JPEG quality ~85), and return its path as `featured_image`. Not urgent.
 
 - Merging places and businesses needs no schema change: they're already one
   `places` table with `type`.
-- "Add to itinerary with a date" from the Explore list uses the existing
-  `POST /user/itineraries/:id/items { place_id, visit_date }` and
-  `POST /user/itineraries { items: [{ place_id, visit_date }] }`.
+- "Add to passport with a date" from the Explore list uses the existing
+  `POST /user/passports/:id/items { place_id, visit_date }` and
+  `POST /user/passports { items: [{ place_id, visit_date }] }`
+  (`/user/itineraries`, the old path, still works as an alias for now).
 - The location map on place and listing pages uses the free Maps Embed API
-  with `name, address`, same as the itinerary map. No backend change.
+  with `name, address`, same as the passport map. No backend change.

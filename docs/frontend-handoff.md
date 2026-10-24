@@ -1,4 +1,4 @@
-# Frontend handoff: email links, itineraries, maps
+# Frontend handoff: email links, passports, maps
 
 Backend branch: `cleanup/remove-dead-code` (marco_passport_backend). This note
 lists what the frontend (public site + admin panel) must change to match it.
@@ -12,7 +12,7 @@ Base URL for everything below: `<API>/api/v1`.
   `timezone` (IANA name, e.g. `America/Cayman`; used for login history).
 - Access tokens last **30 minutes** and there is no refresh token. Treat any
   **401** on a user route as "logged out": clear the stored token and show the
-  login popup. Don't lose what the user was doing (see the itinerary draft below).
+  login popup. Don't lose what the user was doing (see the passport draft below).
 - Image fields (`featured_image`, etc.) are paths like `/images/abc.jpg`,
   relative to the API host.
 
@@ -23,8 +23,9 @@ Base URL for everything below: `<API>/api/v1`.
 | `POST /user/auth/reset-password` (logged in: old/new/confirm password) | `POST /user/auth/change-password`, same body |
 | `POST /user/auth/forgot-password` (OTP-based, never worked) | Link-based flow, see §2.3 |
 | Register logged the user in / account active immediately | Account is `PENDING` until the emailed link is opened, see §2.1 |
-| `/user/passport/*` | Removed. Use `/user/itineraries/*`, see §3 |
-| `is_in_passport` on place list/detail responses | `is_in_itinerary` (place is in *any* of the user's itineraries) |
+| `/user/passport/*` | Removed. Use `/user/passports/*` (plural), see §3 |
+| `/user/itineraries/*` | Renamed to `/user/passports/*`; same requests and responses. The old path still works as an alias for now, so switch before it's removed. |
+| `is_in_passport` on place list/detail responses | `is_in_itinerary` (place is in *any* of the user's passports; the key keeps this name) |
 | `/payment/*` | Removed (no payments in the app). Delete any Stripe code/keys. |
 | Admin: `passports_count` / `user_passports` on users | `itineraries_count` / `itineraries[].items[].place` |
 | Admin: `GET /admin/user*`, `GET /explore/admin*`, `GET /business-submission` had no auth | Need the admin `x-access-token` (same as the other admin calls) |
@@ -47,7 +48,7 @@ Base URL for everything below: `<API>/api/v1`.
      email link scanners can't verify accounts on their own).
    - 200 → `data` is the **same shape as login** (§2.2): store the token, the
      user is now logged in. Then run the "save pending draft" step (§3.3) and
-     redirect (to the saved itinerary if there was a draft, else home).
+     redirect (to the saved passport if there was a draft, else home).
    - 400 "invalid or has expired" → show an error with a link to log in and a
      resend form.
 3. `POST /user/auth/resend-verification` `{ email }` → always 200 with a
@@ -92,29 +93,34 @@ The site has no separate auth pages: the links above open dialogs over the
 home page, and the old `/verify-email` and `/reset-password` paths redirect
 there (keeping the token). The backend builds the links from `FRONTEND_URL`.
 
-## 3. My Passport = itineraries
+## 3. My Passport = passports
 
 Users can only pick **places listed by the admin** (the explore and places
-pages): no free-text or "search Google" places. Every itinerary item is a
+pages): no free-text or "search Google" places. Every passport item is a
 `place_id` from those listings, and the backend rejects anything else.
 
-A user can have **many itineraries** (trip plans). Each has a name, optional
+A user can have **many passports** (trip plans). Each has a name, optional
 start/end dates, and an **ordered** list of places, each with an optional
 visit date. Order = visiting order = the route drawn on the map. Max **20
-places** per itinerary; a place can appear only once per itinerary.
+places** per passport; a place can appear only once per passport.
 
 ### 3.1 API (all need `x-access-token`; 401 → login popup)
 
+The routes live under `/user/passports`. `/user/itineraries`, the old path,
+still works as an alias for the same routes for now, so the deployed site
+keeps working during the switch. Use `/user/passports` for every call: the
+alias will be removed.
+
 | Method & path | Body | Returns |
 |---|---|---|
-| `GET /user/itineraries` | – | array of itineraries, newest-edited first; `items[].place` has `id, name, slug, featured_image`; plus `item_count` |
-| `POST /user/itineraries` | `{ name?, start_date?, end_date?, items?: [{ place_id, visit_date? }] }` | 201, full itinerary |
-| `GET /user/itineraries/:id` | – | full itinerary |
-| `PUT /user/itineraries/:id` | any of `name, start_date, end_date, items` | full itinerary |
-| `DELETE /user/itineraries/:id` | – | 200 |
-| `POST /user/itineraries/:id/items` | `{ place_id, visit_date? }` | 201, full itinerary (place appended at the end) |
+| `GET /user/passports` | – | array of passports, newest-edited first; `items[].place` has `id, name, slug, featured_image`; plus `item_count` |
+| `POST /user/passports` | `{ name?, start_date?, end_date?, items?: [{ place_id, visit_date? }] }` | 201, full passport |
+| `GET /user/passports/:id` | – | full passport |
+| `PUT /user/passports/:id` | any of `name, start_date, end_date, items` | full passport |
+| `DELETE /user/passports/:id` | – | 200 |
+| `POST /user/passports/:id/items` | `{ place_id, visit_date? }` | 201, full passport (place appended at the end) |
 
-Full itinerary shape:
+Full passport shape:
 ```json
 {
   "id": 12, "user_id": 3, "name": "Cayman trip",
@@ -129,25 +135,25 @@ Full itinerary shape:
 }
 ```
 - Dates are `YYYY-MM-DD` strings. Send `null` or `""` to clear one in PUT.
-- `name` defaults to "My itinerary" if omitted on create.
+- `name` defaults to "My passport" if omitted on create.
 - **`items` in PUT replaces the whole list in the order given.** That's how the
   edit screen saves reordering, removals and visit-date changes: keep the
   list in local state and send all of it on Save.
 - Every place has an `address` (admins must enter one); the map uses it
   (§4). `latitude`/`longitude` are optional extras: strings (DECIMAL) or `null`.
 - Validation errors are 400 with a readable `message`; a missing or someone
-  else's itinerary is 404.
+  else's passport is 404.
 
 ### 3.2 Screens
 
-- **My Passport (logged in):** list of itineraries (name, dates, place count,
-  thumbnails from `items[].place.featured_image`) + "New itinerary".
-- **Itinerary page:** two columns on desktop (stacked on mobile): left, the
+- **My Passport (logged in):** list of passports (name, dates, place count,
+  thumbnails from `items[].place.featured_image`) + "New passport".
+- **Passport page:** two columns on desktop (stacked on mobile): left, the
   ordered places (drag to reorder, remove, date picker per place, rename,
-  trip dates, Save / Delete itinerary); right, the map (§4).
-- **Add to itinerary** button on place/listing pages:
-  - logged in: pick an existing itinerary (`GET /user/itineraries`) → `POST /:id/items`,
-    or "New itinerary" → `POST /user/itineraries` with that one item.
+  trip dates, Save / Delete passport); right, the map (§4).
+- **Add to passport** button on place/listing pages:
+  - logged in: pick an existing passport (`GET /user/passports`) → `POST /:id/items`,
+    or "New passport" → `POST /user/passports` with that one item.
     Use `is_in_itinerary` from list/detail responses to show an "Added" state.
   - guest: add to the local draft (§3.3).
 
@@ -155,22 +161,23 @@ Full itinerary shape:
 
 Guests can open My Passport and add places without an account:
 
-1. Keep a **draft** in `localStorage` (e.g. key `mp_itinerary_draft`):
+1. Keep a **draft** in `localStorage` (e.g. key `mp_itinerary_draft`; if the
+   site already uses a key, keep it, or guests lose their drafts):
    `{ name, start_date, end_date, items: [{ place_id, visit_date, place: {…snapshot for display…} }] }`.
    Enforce the 20-place limit and no-duplicates on the client too. The draft
-   page works exactly like the itinerary page (list + map) from the snapshot.
+   page works exactly like the passport page (list + map) from the snapshot.
 2. **Save** (or any action that needs an account) → if not logged in, open the
    **login popup** (with "Create account" and "Forgot password" links) and keep
    the draft.
 3. After a successful login (login popup or verify dialog): if a draft exists,
-   `POST /user/itineraries` with it (only `name`, dates and
+   `POST /user/passports` with it (only `name`, dates and
    `items[{ place_id, visit_date }]`), clear the draft on 201, and navigate to
-   the new itinerary. If the POST fails with 400 (e.g. a place was
+   the new passport. If the POST fails with 400 (e.g. a place was
    unlisted meanwhile), keep the draft and show the message.
 4. If they choose "Create account" in the popup: after register they must
    verify by email first. The verify link opens in the same browser, so the
    verify dialog will find the draft in `localStorage` and save it (step 3).
-5. On a 401 while editing a saved itinerary (session expired), keep unsaved
+5. On a 401 while editing a saved passport (session expired), keep unsaved
    edits in memory, show the login popup, then retry the PUT.
 
 ## 4. Map: keep Google cost at (effectively) zero
@@ -218,7 +225,7 @@ Notes:
   after the user **saves** (or on a short debounce), not on every drag.
 - Google's docs (checked 2026-10-12): the Embed API is "free to use with
   unlimited requests", and directions mode takes "up to 20 waypoints". The
-  backend caps itineraries at 20 places (origin + destination + ≤18
+  backend caps passports at 20 places (origin + destination + ≤18
   waypoints), so the whole route always fits one embed.
 - API key: a **separate browser key** restricted to **Maps Embed API only**
   and to the site's HTTP referrers. Put it in the frontend env (e.g.
