@@ -38,6 +38,11 @@ const errorHandler = (err, req, res, next) => {
         ? `Unexpected upload field "${err.field}". Upload images in the "images" field.`
         : err.message;
     isOperational = true;
+  } else if (err.type === "entity.parse.failed") {
+    // express.json() couldn't parse the body: the client's mistake, not ours.
+    statusCode = httpStatus.BAD_REQUEST;
+    message = "The request body isn't valid JSON.";
+    isOperational = true;
   }
 
   // Log the real error regardless of what the client sees.

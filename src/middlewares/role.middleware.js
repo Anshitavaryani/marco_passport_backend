@@ -5,12 +5,15 @@ const { roleService } = require("../services");
 const { rolesTypes } = require("../config/types");
 const responseWrapper = require("../config/responseWrapper");
 
-// req.user is the JWT payload; role_id is the admin's role primary key.
+// Runs after validateJWTtoken. The role comes from the admin's row it
+// loaded (req.body.user), not the token (req.user), so a role change takes
+// effect at once instead of when the 5-day token expires.
 // Roles are matched on roles.abbreviation (SUP_ADM, ADM, ...), not on the
 // display name.
 const allowRoles = (allowed) =>
   catchAsync(async (req, res, next) => {
-    const roleDoc = await roleService.findRoleById(req.user.role_id);
+    const roleId = req.body?.user?.role_id ?? req.user.role_id;
+    const roleDoc = await roleService.findRoleById(roleId);
     if (roleDoc && allowed.includes(roleDoc.abbreviation)) {
       return next();
     }

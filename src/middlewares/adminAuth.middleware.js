@@ -7,10 +7,16 @@ const catchAsync = require("../utils/catchAsync");
 const responseWrapper = require("../config/responseWrapper");
 const { roleService } = require("../services");
 const config = require("../config/config");
+const { adminPanelRoles } = require("../config/types");
 const { validateResetPassordBody } = require("./common.middleware");
 
+// Only super admins reach this (see the route), and they may create other
+// super admins.
 const validateCreateAdminBody = catchAsync(async (req, res, next) => {
-  const { name, email, role_id, department_id } = req.body;
+  const { role_id, department_id } = req.body;
+  const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
+  const email =
+    typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : "";
   if (!name || !email || !role_id || !department_id) {
     return responseWrapper(
       res,
@@ -20,17 +26,7 @@ const validateCreateAdminBody = catchAsync(async (req, res, next) => {
     );
   }
 
-  // role_id may arrive as a number; config values are strings.
-  if (String(role_id) === String(config.SUP_ADM_ROLE_ID)) {
-    return responseWrapper(
-      res,
-      "",
-      "You are not authorized to create this role.",
-      httpStatus.BAD_REQUEST
-    );
-  }
-
-  if (!validateEmail(email) || name.length === 0) {
+  if (!validateEmail(email)) {
     return responseWrapper(
       res,
       "",
@@ -48,9 +44,18 @@ const validateCreateAdminBody = catchAsync(async (req, res, next) => {
     );
   }
 
-  const isValidRoleId = await roleService.findRoleById(parseInt(role_id, 10));
-  if (!isValidRoleId) {
+  const role = await roleService.findRoleById(parseInt(role_id, 10));
+  if (!role) {
     return responseWrapper(res, "", "Invalid Role Id", httpStatus.BAD_REQUEST);
+  }
+  // e.g. USR, the public sign-up role, which can't use the panel.
+  if (!adminPanelRoles.includes(role.abbreviation)) {
+    return responseWrapper(
+      res,
+      "",
+      "This role can't be given to an admin.",
+      httpStatus.BAD_REQUEST
+    );
   }
 
   const isValidDepartmentId = await Department.findByPk(
@@ -65,6 +70,8 @@ const validateCreateAdminBody = catchAsync(async (req, res, next) => {
     );
   }
 
+  req.body.name = name;
+  req.body.email = email;
   next();
 });
 

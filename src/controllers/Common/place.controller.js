@@ -91,7 +91,7 @@ const findPlaceToVisitBySlug = catchAsync(async (req, res) => {
 });
 
 const getAllPlacesAdmin = catchAsync(async (req, res) => {
-  const result = await placeService.getAllPlaces(req.query);
+  const result = await placeService.getAllPlacesAdmin(req.query);
   return responseWrapper(res, result, "");
 });
 

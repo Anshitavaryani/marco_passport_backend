@@ -1,5 +1,7 @@
 const adminAuthRoute = require('./adminAuth.route');
 const userRoute = require('./user.routes')
+const passportRoute = require('./passport.route');
+const statsRoute = require('./stats.route');
 
 
 const adminRoutes = [
@@ -10,6 +12,14 @@ const adminRoutes = [
      {
         path: '/admin/user/',
         route: userRoute,
+    },
+    {
+        path: '/admin/passports',
+        route: passportRoute,
+    },
+    {
+        path: '/admin/stats',
+        route: statsRoute,
     },
 ];
 

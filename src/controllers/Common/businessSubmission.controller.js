@@ -21,7 +21,17 @@ const getAllSubmissions = catchAsync(async (req, res) => {
   return responseWrapper(res, submissions, "");
 });
 
+const updateSubmissionStatus = catchAsync(async (req, res) => {
+  const submission = await businessSubmissionService.updateSubmissionStatus(
+    req.params.id,
+    req.body.status,
+  );
+
+  return responseWrapper(res, submission, "Business request updated.");
+});
+
 module.exports = {
   createSubmission,
   getAllSubmissions,
+  updateSubmissionStatus,
 };

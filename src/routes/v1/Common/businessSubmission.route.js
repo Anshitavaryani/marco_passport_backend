@@ -14,4 +14,10 @@ router.get(
   businessSubmissionController.getAllSubmissions
 );
 
+router.put(
+  "/:id",
+  [adminAuthMiddleware.validateJWTtoken, roleMiddleware.isAdmin],
+  businessSubmissionController.updateSubmissionStatus
+);
+
 module.exports = router;

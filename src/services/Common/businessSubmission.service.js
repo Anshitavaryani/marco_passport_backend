@@ -62,7 +62,31 @@ const getAllSubmissions = async () => {
   });
 };
 
+const STATUSES = ["pending", "approved", "rejected"];
+
+// Admins mark a request approved or rejected once they've followed it up.
+const updateSubmissionStatus = async (id, status) => {
+  if (!STATUSES.includes(status)) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `Invalid status. Must be one of: ${STATUSES.join(", ")}`,
+    );
+  }
+
+  const submission = await BusinessSubmission.findByPk(id);
+  if (!submission) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Business request not found.");
+  }
+
+  submission.status = status;
+  await submission.save();
+  // Re-read: after save() the instance holds updated_at as the
+  // CURRENT_TIMESTAMP literal (the model's default), not a date.
+  return submission.reload();
+};
+
 module.exports = {
   createSubmission,
   getAllSubmissions,
+  updateSubmissionStatus,
 };

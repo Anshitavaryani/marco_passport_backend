@@ -58,16 +58,20 @@ const findAdminById = catchAsync(async (req, res) => {
   return responseWrapper(res, adminDoc, "");
 });
 
+// req.body.user is the signed-in admin (set by validateJWTtoken): the
+// service needs it to stop admins changing their own role or deleting
+// themselves.
 const updateAdmin = catchAsync(async (req, res) => {
   const response = await adminAuthService.updateAdmin(
     req.params.id,
-    req.body
+    req.body,
+    req.body.user
   );
   return responseWrapper(res, response, "Admin updated successfully.");
 });
 
 const deleteAdmin = catchAsync(async (req, res) => {
-  await adminAuthService.deleteAdmin(req.params.id);
+  await adminAuthService.deleteAdmin(req.params.id, req.body.user);
   return responseWrapper(res, "", "Deleted Successfully.", httpStatus.OK);
 });
 

@@ -19,6 +19,10 @@ const rolesTypes = {
   EDTR: "EDTR",
 };
 
+// Roles an admin account can have: every role above can sign in to the
+// admin panel. Anything else (e.g. USR, public sign-up) can't.
+const adminPanelRoles = Object.values(rolesTypes);
+
 // NOTE: 'varification' is a typo, but VERIFY_EMAIL's value is persisted in
 // the user_tokens.token_type ENUM — fixing it needs a DB migration.
 const tokenTypes = {
@@ -34,5 +38,6 @@ module.exports = {
   userStatusTypes,
   otpTypes,
   rolesTypes,
+  adminPanelRoles,
   tokenTypes,
 };

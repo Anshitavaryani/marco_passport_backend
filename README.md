@@ -46,6 +46,7 @@ it defaults to `USR_ROLE_ID`.
 - Email-link tokens are stored hashed (SHA-256) in `user_tokens`.
 
 Frontend integration notes: [docs/frontend-handoff.md](docs/frontend-handoff.md).
+Admin panel API: [docs/admin-handoff.md](docs/admin-handoff.md).
 
 ## npm scripts
 

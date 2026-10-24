@@ -139,8 +139,10 @@ Full passport shape:
 - **`items` in PUT replaces the whole list in the order given.** That's how the
   edit screen saves reordering, removals and visit-date changes: keep the
   list in local state and send all of it on Save.
-- Every place has an `address` (admins must enter one); the map uses it
-  (§4). `latitude`/`longitude` are optional extras: strings (DECIMAL) or `null`.
+- Every place has an `address` (admins must enter one). Since 2026-10-24
+  admins must also set a map pin, so `latitude`/`longitude` (DECIMAL strings)
+  are set on every listing saved since; older ones can still be `null` until
+  an admin sets their pin. The map uses them (§4).
 - Validation errors are 400 with a readable `message`; a missing or someone
   else's passport is 404.
 
@@ -192,22 +194,26 @@ Cost is the top priority here, so stick to these rules.
 
 **Do not use** the Maps JavaScript API, Directions/Routes API, Places API,
 Geocoding API or Distance Matrix. These are billed per call or per map load.
-We never need them: every place is an admin listing with an address, and the
-free Embed map and Maps URLs locate an address themselves. Nothing has to
-be searched or geocoded by us.
+We never need them: every place is an admin listing with a pin set in the
+admin panel, and the free Embed map and Maps URLs take coordinates or
+addresses directly. Nothing has to be searched or geocoded by
+us.
 
 ### 4.1 Map panel (iframe)
 
-Each stop is identified by a **location string** built from the place:
+Each stop is identified by:
 
-```js
-const stop = (p) => encodeURIComponent(`${p.name}, ${p.address}`);
-```
+1. `latitude,longitude` when set: the admin's pin, exactly where they put it.
+2. else a **location string**, ``encodeURIComponent(`${p.name}, ${p.address}`)``
+   (older listings without a pin).
 
-Name + address gives Google the best match (e.g. "Rum Point, Rum Point Dr,
-North Side"). Google's docs accept a place name/address for **every** stop
-(origin, destination and waypoints), so this is the documented, safe format.
-The Embed map resolves the address itself, still free.
+Maps URLs ("Directions", "Open in Google Maps") take the same stop in
+`origin`/`destination`/`query`, so they open the pin itself. Don't link to a
+listing's Google Maps profile (no `*_place_id` parameters): the site shows
+our listings, not Google's.
+
+Google's docs accept coordinates or a place name/address for **every** stop
+(origin, destination and waypoints), all still free.
 
 - 0 places: show a placeholder, no iframe.
 - 1 place: `https://www.google.com/maps/embed/v1/place?key=KEY&q=STOP`
@@ -219,7 +225,7 @@ The Embed map resolves the address itself, still free.
 
 Notes:
 - If a pin lands in the wrong spot for some listing, the fix is on the admin
-  side (a more complete address), not on the frontend.
+  side (move the pin), not on the frontend.
 - `loading="lazy"` on the iframe, and render it only when the panel is
   visible (e.g. behind a "Show map" toggle on mobile). Only rebuild `src`
   after the user **saves** (or on a short debounce), not on every drag.
