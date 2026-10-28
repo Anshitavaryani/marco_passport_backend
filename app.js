@@ -30,7 +30,9 @@ app.use(
   })
 );
 
-// parse json request body
+// parse json request body. Magazine issues are saved whole and outgrow the
+// default 100 KB; the global parser then skips the body this one has read.
+app.use("/api/v1/magazine/admin", express.json({ limit: "2mb" }));
 app.use(express.json());
 
 // parse urlencoded request body

@@ -8,6 +8,7 @@ const stateController = require('./state.controller');
 const cityController = require('./city.controller');
 const blogCategoryController = require('./blogCategory.controller');
 const blogController = require('./blog.controller');
+const magazineController = require('./magazine.controller');
 const placeCategoryController = require('./placeCategory.controller');
 const placeController = require('./place.controller');
 const reviewController = require('./review.controller');
@@ -25,6 +26,7 @@ module.exports = {
     cityController,
     blogCategoryController,
     blogController,
+    magazineController,
     placeCategoryController,
     placeController,
     reviewController,

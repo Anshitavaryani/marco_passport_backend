@@ -43,6 +43,11 @@ const errorHandler = (err, req, res, next) => {
     statusCode = httpStatus.BAD_REQUEST;
     message = "The request body isn't valid JSON.";
     isOperational = true;
+  } else if (err.type === "entity.too.large") {
+    // Over express.json()'s limit (app.js).
+    statusCode = httpStatus.REQUEST_ENTITY_TOO_LARGE;
+    message = "The request is too large.";
+    isOperational = true;
   }
 
   // Log the real error regardless of what the client sees.

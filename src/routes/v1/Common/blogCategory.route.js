@@ -4,15 +4,16 @@ const router = express.Router();
 const { blogCategoryController } = require("../../../controllers");
 const { adminAuthMiddleware, roleMiddleware } = require("../../../middlewares");
 
-const requireAdmin = [
+// Admins and Editors.
+const requireContentEditor = [
   adminAuthMiddleware.validateJWTtoken,
-  roleMiddleware.isAdmin,
+  roleMiddleware.isContentEditor,
 ];
 
-router.post("/", requireAdmin, blogCategoryController.createCategory);
+router.post("/", requireContentEditor, blogCategoryController.createCategory);
 router.get("/", blogCategoryController.getAllCategories);
 router.get("/:id", blogCategoryController.findCategoryById);
-router.put("/:id", requireAdmin, blogCategoryController.updateCategory);
-router.delete("/:id", requireAdmin, blogCategoryController.deleteCategory);
+router.put("/:id", requireContentEditor, blogCategoryController.updateCategory);
+router.delete("/:id", requireContentEditor, blogCategoryController.deleteCategory);
 
 module.exports = router;

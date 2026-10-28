@@ -7,6 +7,7 @@ const stateRoute = require("./state.route");
 const cityRoute = require("./city.route");
 const blogRoute = require("./blog.route");
 const blogCategoryRoute = require("./blogCategory.route");
+const magazineRoute = require("./magazine.route");
 const placeCategoryRoute = require("./placeCategory.route");
 const exploreRoute = require("./explore.route");
 const businessSubmissionRoute = require("./businessSubmission.route");
@@ -48,6 +49,10 @@ const commonRoutes = [
   {
     path: "/blog-category",
     route: blogCategoryRoute,
+  },
+  {
+    path: "/magazine",
+    route: magazineRoute,
   },
   {
     path: "/place-category",

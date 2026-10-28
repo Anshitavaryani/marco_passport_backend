@@ -5,17 +5,18 @@ const { blogController, mediaController } = require("../../../controllers");
 const { adminAuthMiddleware, roleMiddleware } = require("../../../middlewares");
 const upload = require("../../../config/multer");
 
-const requireAdmin = [
+// Admins and Editors.
+const requireContentEditor = [
   adminAuthMiddleware.validateJWTtoken,
-  roleMiddleware.isAdmin,
+  roleMiddleware.isContentEditor,
 ];
 
 router.get("/", blogController.getAllBlogs);
 router.get("/category/:slug", blogController.getBlogsByCategorySlug);
 router.get("/:id", blogController.findBlogById);
-router.post("/", requireAdmin, upload, blogController.createBlog);
-router.put("/:id", requireAdmin, upload, blogController.updateBlog);
-router.delete("/:id", requireAdmin, blogController.deleteBlog);
+router.post("/", requireContentEditor, upload, blogController.createBlog);
+router.put("/:id", requireContentEditor, upload, blogController.updateBlog);
+router.delete("/:id", requireContentEditor, blogController.deleteBlog);
 
 
 router.post(

@@ -41,8 +41,18 @@ const isEditor = allowRoles([
   rolesTypes.EDTR,
 ]);
 
+// Blog and magazines: every admin role plus Editors, who can do only this.
+// Not isEditor: that one includes Engineers, who only manage FAQs.
+const isContentEditor = allowRoles([
+  rolesTypes.SUP_ADM,
+  rolesTypes.ADM,
+  rolesTypes.SUB_ADM,
+  rolesTypes.EDTR,
+]);
+
 module.exports = {
   isSuperAdmin,
   isAdmin,
   isEditor,
+  isContentEditor,
 };

@@ -19,6 +19,7 @@ const NewsletterSubscriber = require("./newsletterSubscriber.model");
 
 const BlogCategory = require("./blogCategory.model");
 const Blog = require("./blog.model");
+const Magazine = require("./magazine.model");
 const Place = require("./place.model");
 const PlaceCategory = require("./placeCategory.model");
 const PlaceCategoryMap = require("./placeCategoryMap.model");
@@ -50,6 +51,7 @@ module.exports = {
 
   BlogCategory,
   Blog,
+  Magazine,
 
   Place,
   PlaceCategory,

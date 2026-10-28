@@ -5,9 +5,19 @@ admin API as it stands now. The public site has its own note:
 [frontend-handoff.md](frontend-handoff.md).
 
 Base URL: `<API>/api/v1`. Every response is `{ success, status, message, data }`;
-show `message` on errors. A request body that isn't valid JSON is a 400.
+show `message` on errors. A request body that isn't valid JSON is a 400; one
+over the size limit (100 KB, or 2 MB for magazine saves) is a 413.
 
 ## 1. What changed (do these first)
+
+### 2026-10-28: magazines, and Editors on the blog
+
+| Area | Change | What to do |
+|---|---|---|
+| Roles | Editors (`EDTR`) can now create, edit and delete **blog posts and blog categories** (they used to get 401) and magazines. Every other admin endpoint still refuses them with 401. | Nothing: the admin already shows Editors only Dashboard, Magazines, Blog and Blog Categories. |
+| Magazines | New `/magazine/admin` endpoints: list, get, create, update, delete (§4 "Magazines"). Saves send the `version` they loaded; **409** when someone else saved the issue first. | The Magazines screen works once this is deployed. |
+| Magazines | New public `GET /magazine` and `GET /magazine/:slug` for the site ([frontend-handoff.md](frontend-handoff.md) §5). | |
+| Errors | A body over the size limit is now **413** "The request is too large." (it was a 500). | Show `message`. |
 
 ### 2026-10-24: explore items, coordinates, newsletter, users, passports, admins
 
@@ -68,9 +78,13 @@ five can be given to an admin account.
 | Tier | Roles | Can use |
 |---|---|---|
 | Super admin | `SUP_ADM` | everything below + admin accounts (`/admin/auth/register`, `/all`, `/:id`) + roles (`/role`) |
-| Admin | `SUP_ADM`, `ADM`, `SUB_ADM` | dashboard stats, members, passports, explore items, place & blog categories, blogs, departments, contact messages, newsletter, business requests |
-| Editor | the above + `ENG`, `EDTR` | FAQs |
+| Admin | `SUP_ADM`, `ADM`, `SUB_ADM` | dashboard stats, members, passports, explore items, place categories, departments, contact messages, newsletter, business requests |
+| Content | the above + `EDTR` | blog posts, blog categories, magazines |
+| FAQ | the above + `ENG`, `EDTR` | FAQs |
 | Any logged-in admin | all | profile, change password, `POST /blog/upload-image` |
+
+So an Editor (`EDTR`) works on the blog, magazines and FAQs only, and an
+Engineer (`ENG`) on FAQs only.
 
 Hide menu items the logged-in admin's tier can't use. The API refuses them
 with 401 anyway.
@@ -191,13 +205,58 @@ together on /explore.
 - `POST` / `PUT /place-category[/:id]` `{ name, type, slug?, is_active? }` + optional `images` upload (card image) or `image` path
 - `DELETE /place-category/:id`
 
-### Blogs (admin; GETs are public)
+### Blogs (admin and Editors; GETs are public)
 - `GET /blog?category_id=&featured=true|false`, `GET /blog/:id`, `GET /blog/category/:slug`
 - `POST /blog` (required `title`, `description`, `content`; optional `category_id`, `slug`, `is_featured`, `published_at`; cover via `images` upload or `featured_image` path), `PUT /blog/:id`, `DELETE /blog/:id`
-- Images inside the rich-text editor (and explore photos): `POST /blog/upload-image` with one file in `images` → `{ url }`.
+- Images inside the rich-text editor (and explore and magazine photos): `POST /blog/upload-image` with one file in `images` → `{ url }`.
 
-### Blog categories (admin; GETs are public)
+### Blog categories (admin and Editors; GETs are public)
 `GET /blog-category`, `GET /blog-category/:id`, `POST /blog-category` `{ name, slug? }`, `PUT /blog-category/:id`, `DELETE /blog-category/:id`.
+
+### Magazines (admin and Editors)
+An issue is an ordered list of pages, each `{ id, layout, content }`, as the
+magazine builder makes them. The server stores `pages` as sent and always
+returns it as a JSON array.
+
+- `GET /magazine/admin?status=draft|published&search=&page=1&limit=12` (`limit` ≤ 100) →
+  `{ total, page, limit, total_pages, magazines: [summary], counts: { all, draft, published } }`,
+  most recently edited first. `search` matches the title, issue label and
+  season; `counts` follow the search but not `status` (for the tabs).
+  A summary is `{ id, title, slug, issue_label, season, publish_date, status, is_featured, cover_image, page_count, created_at, updated_at, updated_by_name }`;
+  `updated_by_name` is null once that admin is deleted.
+- `GET /magazine/admin/:id` → the full issue: the summary plus
+  `masthead, tagline, description, pages, version, updated_by`. 404 "Issue
+  not found." if it doesn't exist or was deleted.
+- `POST /magazine/admin` → 201, the full issue (`version: 1`). Body, every field always sent:
+  `{ title, slug, issue_label, season, publish_date, masthead, tagline, description, status, is_featured, cover_image, pages }`.
+- `PUT /magazine/admin/:id` with the same body plus the `version` you loaded →
+  the full issue with its new `version`. If someone saved it since: **409**
+  "This issue was saved by someone else since you opened it."; if it was
+  deleted meanwhile: 404. Those two come before any 400 about the address.
+- `DELETE /magazine/admin/:id`: soft delete. Its address becomes free for
+  another issue, and it stops being featured. Uploaded photos stay.
+
+Validation (400, with a message to show as is):
+- `title` required, ≤ 150 characters; `issue_label` and `season` ≤ 60,
+  `masthead` ≤ 40, `tagline` ≤ 200, `description` ≤ 500. Text is trimmed and
+  stored as typed, not HTML-escaped; `""` is stored as `null`.
+- `slug`: lowercase letters, numbers and single hyphens, ≤ 160, not `admin`,
+  and not used by another issue that isn't deleted ("Another issue already
+  uses the address <slug>.").
+- `status`: `draft` or `published`. Publishing needs a `publish_date`
+  (`YYYY-MM-DD`) and at least 2 pages.
+- `is_featured`: only on a published issue. Saving one as featured
+  un-features the others.
+- `pages`: 1 to 200 pages, at most 1 MB in all. Each has a unique string `id`
+  (≤ 40), a `layout` (`cover`, `contents`, `letter`, `feature`, `article`,
+  `text`, `quote`, `photo`, `gallery`, `guide`, `ad_half`, `ad_cards`,
+  `image_page`, `back`) and an object `content`. Content keys the server
+  doesn't know are kept.
+- Images (any object in `pages` with a `src`): `src` starts with `/images/`
+  or `http(s)://`, `focusX`/`focusY` are 0 to 100, `alt` ≤ 200. `cover_image`
+  follows the same `src` rule, ≤ 255.
+- Every `link` and `website`: empty, `http(s)://…`, a site path (`/…`),
+  `mailto:`, `tel:`, or a bare domain like `www.example.com`.
 
 ### FAQs (editor; GET is public)
 `GET /faq`, `POST /faq` `{ question, answer }`, `PUT /faq/:id`, `DELETE /faq/:id`.

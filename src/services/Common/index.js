@@ -9,6 +9,7 @@ const stateService = require('./state.service');
 const cityService = require('./city.service');
 const blogCategoryService = require('./blogCategory.service');
 const blogService = require('./blog.service');
+const magazineService = require('./magazine.service');
 const placeCategoryService = require('./placeCategory.service');
 const placeService = require('./place.service');
 const reviewService = require('./review.service');
@@ -27,6 +28,7 @@ module.exports = {
     cityService,
     blogCategoryService,
     blogService,
+    magazineService,
     placeCategoryService,
     placeService,
     reviewService,

@@ -248,6 +248,41 @@ using the same `STOP` strings:
 `&waypoints=STOP_2|STOP_3`. Google Maps limits waypoints in these links
 (fewer on mobile), so the per-leg links are the reliable option.
 
-## 5. Admin panel
+## 5. Magazine
+
+Issues are made in the admin's magazine builder. These endpoints need no
+auth and return **published** issues only.
+
+| Method & path | Returns |
+|---|---|
+| `GET /magazine?page=1&limit=12` | `{ total, page, limit, total_pages, magazines: [issue], featured: issue \| null }`, newest `publish_date` first |
+| `GET /magazine/:slug` | the issue plus `pages`; 404 "Issue not found." for drafts, deleted issues and unknown slugs |
+
+```json
+{ "id": 3, "title": "Coastal Escapes", "slug": "coastal-escapes-issue-07",
+  "issue_label": "Issue 07", "season": "Fall 2026", "publish_date": "2026-10-01",
+  "masthead": "MARCO", "tagline": "…", "description": "…",
+  "cover_image": "/images/….jpg", "page_count": 24, "is_featured": true }
+```
+
+- `featured` is the issue the admin marked as featured, or the newest one if
+  none is. It's also somewhere in `magazines`.
+- `cover_image` and each image `src` in `pages` is a path on the API host
+  (`/images/…`) or a full URL (photos picked from Explore).
+- `pages` is an array of `{ id, layout, content }`. To render it, copy
+  `Marco_passport_admin/src/magazine/` into the site (it has no admin
+  imports) and point the CSS variables at the top of `magazine.css` at the
+  site's colours. Page 1 is the cover, then facing pairs (2–3, 4–5…).
+- Links in pages are site paths (`/explore/<slug>`, `/advertise-with-us`),
+  full URLs, `mailto:`/`tel:`, or bare domains; the reader turns them into
+  hrefs.
+- From the static `src/data/magazines.ts`: `issue` ← `issue_label`, `date` ←
+  `publish_date`, `pages` ← `page_count`, `cover` ← `cover_image` with the
+  image host in front, `featured` ← `is_featured` (or `featured` above).
+  `letter` is the first `letter` page's `body`; `sections` come from
+  `contentsEntries(pages)` in `src/magazine/spreads.ts`. There's no
+  `archived` flag: show older issues, by date, as the archive.
+
+## 6. Admin panel
 
 The admin panel has its own note: [admin-handoff.md](admin-handoff.md).
